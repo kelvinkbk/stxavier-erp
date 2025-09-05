@@ -1,6 +1,13 @@
-# St. Xavier ERP - React Native App
+# 🎓 St. Xavier ERP - Complete Educational Management System
 
-A comprehensive ERP (Enterprise Resource Planning) system for educational institutions built with React Native, Expo, and Firebase.
+[![CI/CD Pipeline](https://github.com/kelvinkbk/stxavier-erp/actions/workflows/ci-cd.yml/badge.svg)](https://github.com/kelvinkbk/stxavier-erp/actions)
+[![Deployment](https://img.shields.io/badge/deployment-vercel-black)](https://vercel.com)
+[![Firebase](https://img.shields.io/badge/backend-firebase-orange)](https://firebase.google.com)
+[![React Native](https://img.shields.io/badge/platform-react%20native-blue)](https://reactnative.dev)
+[![TypeScript](https://img.shields.io/badge/language-typescript-blue)](https://typescriptlang.org)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
+
+A comprehensive **100% FREE** ERP (Enterprise Resource Planning) system for educational institutions built with React Native, Expo, TypeScript, and Firebase.
 
 ## 🚀 All-in-One Quick Start Commands
 
@@ -309,6 +316,8 @@ For support and queries, please contact:
 ## License
 
 This project is licensed under the MIT License - see the LICENSE file for details.
-#   s t x a v i e r - e r p  
- #   s t x a v i e r - e r p  
+#   s t x a v i e r - e r p 
+ 
+ #   s t x a v i e r - e r p 
+ 
  
