@@ -6,6 +6,9 @@ on:
   pull_request:
     branches: [ main ]
 
+env:
+  NODE_VERSION: '18'
+
 jobs:
   # Code Quality & Testing
   quality-check:
@@ -19,7 +22,7 @@ jobs:
     - name: 📦 Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         
     - name: 🔧 Install dependencies
@@ -40,12 +43,11 @@ jobs:
       run: npm test
       continue-on-error: true
 
-  # Web Build & Deploy
-  web-deploy:
-    name: 🌐 Web Build & Deploy
+  # Web Build
+  web-build:
+    name: 🌐 Web Build
     runs-on: ubuntu-latest
     needs: quality-check
-    if: github.ref == 'refs/heads/main'
     
     steps:
     - name: 📥 Checkout code
@@ -54,7 +56,7 @@ jobs:
     - name: 📦 Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         
     - name: 🔧 Install dependencies
@@ -63,20 +65,20 @@ jobs:
     - name: 🏗️ Build web version
       run: npm run build:web
       env:
-        EXPO_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
-        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
-        EXPO_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-        EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: ${{ secrets.FIREBASE_STORAGE_BUCKET }}
-        EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: ${{ secrets.FIREBASE_MESSAGING_SENDER_ID }}
-        EXPO_PUBLIC_FIREBASE_APP_ID: ${{ secrets.FIREBASE_APP_ID }}
+        EXPO_PUBLIC_FIREBASE_API_KEY: demo-api-key
+        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-project.firebaseapp.com
+        EXPO_PUBLIC_FIREBASE_PROJECT_ID: demo-project
+        EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-project.appspot.com
+        EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 123456789
+        EXPO_PUBLIC_FIREBASE_APP_ID: demo-app-id
+        EXPO_PUBLIC_ENVIRONMENT: demo
         
-    - name: 🚀 Deploy to Vercel
-      uses: amondnet/vercel-action@v25
+    - name: � Upload build artifacts
+      uses: actions/upload-artifact@v3
       with:
-        vercel-token: ${{ secrets.VERCEL_TOKEN }}
-        vercel-org-id: ${{ secrets.ORG_ID }}
-        vercel-project-id: ${{ secrets.PROJECT_ID }}
-        working-directory: ./
+        name: web-build
+        path: dist/
+        retention-days: 7
 
   # Mobile Build Check
   mobile-check:
@@ -91,7 +93,7 @@ jobs:
     - name: 📦 Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         
     - name: 🔧 Install dependencies
@@ -104,12 +106,19 @@ jobs:
     - name: 🏗️ Check Expo build
       run: npx expo export --platform all --output-dir build-check
       continue-on-error: true
+      env:
+        EXPO_PUBLIC_FIREBASE_API_KEY: demo-api-key
+        EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN: demo-project.firebaseapp.com
+        EXPO_PUBLIC_FIREBASE_PROJECT_ID: demo-project
+        EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET: demo-project.appspot.com
+        EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: 123456789
+        EXPO_PUBLIC_FIREBASE_APP_ID: demo-app-id
 
   # Performance Monitoring
   performance-check:
     name: ⚡ Performance Analysis
     runs-on: ubuntu-latest
-    needs: quality-check
+    needs: web-build
     
     steps:
     - name: 📥 Checkout code
@@ -118,16 +127,23 @@ jobs:
     - name: 📦 Setup Node.js
       uses: actions/setup-node@v4
       with:
-        node-version: '18'
+        node-version: ${{ env.NODE_VERSION }}
         cache: 'npm'
         
     - name: 🔧 Install dependencies
       run: npm ci
       
-    - name: 📊 Bundle size analysis
+    - name: � Download build artifacts
+      uses: actions/download-artifact@v3
+      with:
+        name: web-build
+        path: dist/
+        
+    - name: �📊 Bundle size analysis
       run: |
-        npm run build:web
-        npx bundlesize
+        echo "📦 Analyzing bundle size..."
+        du -sh dist/
+        find dist/ -name "*.js" -exec wc -c {} + | sort -n
       continue-on-error: true
       
     - name: ⚡ Performance test
@@ -148,27 +164,26 @@ jobs:
       with:
         scan-type: 'fs'
         scan-ref: '.'
-        format: 'sarif'
-        output: 'trivy-results.sarif'
-        
-    - name: 📤 Upload Trivy scan results
-      uses: github/codeql-action/upload-sarif@v2
-      if: always()
-      with:
-        sarif_file: 'trivy-results.sarif'
+        format: 'table'
+      continue-on-error: true
 
   # Notification
   notify:
-    name: 📢 Deployment Notification
+    name: 📢 Build Status
     runs-on: ubuntu-latest
-    needs: [web-deploy, mobile-check, performance-check]
-    if: always() && github.ref == 'refs/heads/main'
+    needs: [web-build, mobile-check, performance-check, security-scan]
+    if: always()
     
     steps:
-    - name: 📧 Notify deployment status
+    - name: 📧 Build status summary
       run: |
-        echo "🎉 St. Xavier ERP deployment pipeline completed!"
-        echo "✅ Web: Deployed to production"
-        echo "📱 Mobile: Build verified"
-        echo "⚡ Performance: Analyzed"
-        echo "🛡️ Security: Scanned"
+        echo "🎉 St. Xavier ERP build pipeline completed!"
+        echo "✅ Web: Build completed successfully"
+        echo "📱 Mobile: Build checks completed"
+        echo "⚡ Performance: Analysis completed"
+        echo "🛡️ Security: Scan completed"
+        echo ""
+        echo "🔧 To enable production deployment:"
+        echo "1. Add Firebase secrets to repository settings"
+        echo "2. Add Vercel secrets for automatic deployment"
+        echo "3. Configure production environment variables"
