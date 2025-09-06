@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "stxavier-erp",
+    "name": "St. Xavier ERP",
     "slug": "stxavier-erp",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -13,17 +13,24 @@
       "backgroundColor": "#ffffff"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.stxavier.erp"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
         "backgroundColor": "#ffffff"
       },
-      "edgeToEdgeEnabled": true
+      "edgeToEdgeEnabled": true,
+      "package": "com.stxavier.erp"
     },
     "web": {
-      "favicon": "./assets/favicon.png"
-    }
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "scheme": "stxavier-erp",
+    "platforms": ["ios", "android", "web"],
+    "description": "Complete Educational ERP System for St. Xavier College",
+    "githubUrl": "https://github.com/kelvinkbk/stxavier-erp"
   }
 }
