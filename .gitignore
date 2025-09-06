@@ -78,3 +78,5 @@ eas.json
 
 # Project specific
 PROJECT_PROGRESS_COMPLETE.txt.backup
+
+.vercel
