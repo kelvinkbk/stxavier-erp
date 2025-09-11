@@ -1,6 +1,6 @@
 // src/screens/Auth/LoginScreen.tsx
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Alert, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput } from "react-native";
 import { signInWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebase";
 import { Button } from "../../components/Button";
@@ -9,6 +9,7 @@ import { LocalStorageService } from "../../services/localStorage";
 import SecurityService from "../../services/SecurityService";
 import PerformanceMonitor from "../../services/PerformanceMonitor";
 import SyncStatusComponent from "../../components/SyncStatusComponent";
+import { UniversalAlert } from "../../utils/universalAlert";
 
 interface LoginScreenProps {
   navigation: any;
@@ -31,7 +32,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
 
   const onLogin = async () => {
     if (!loginInput || !password) {
-      Alert.alert("Error", "Please fill in all fields");
+      UniversalAlert.error("Please fill in all fields");
       return;
     }
 
@@ -103,7 +104,7 @@ export default function LoginScreen({ navigation }: LoginScreenProps) {
       // End timing for failed login
       await monitor.endTiming('user_login_process');
       
-      Alert.alert("Login failed", err.message || "Invalid credentials");
+      UniversalAlert.error(err.message || "Invalid credentials");
     } finally {
       setLoading(false);
     }

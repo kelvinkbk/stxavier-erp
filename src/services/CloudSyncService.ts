@@ -1,23 +1,19 @@
-import { 
-  collection, 
-  doc, 
-  setDoc, 
-  getDoc, 
-  getDocs, 
-  deleteDoc, 
-  onSnapshot, 
-  query, 
-  where, 
-  orderBy,
-  serverTimestamp,
-  updateDoc,
-  writeBatch,
-  enableNetwork,
-  disableNetwork
-} from 'firebase/firestore';
-import { db } from '../firebase';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import NetInfo from '@react-native-community/netinfo';
+import {
+    collection,
+    deleteDoc,
+    doc,
+    getDoc,
+    getDocs,
+    onSnapshot,
+    query,
+    serverTimestamp,
+    setDoc,
+    where,
+    writeBatch
+} from 'firebase/firestore';
+import { db } from '../firebase';
 import { User } from '../types';
 import UserLookupService from './UserLookupService';
 
@@ -81,9 +77,9 @@ class CloudSyncService {
       this.netInfoUnsubscribe = NetInfo.addEventListener((state) => {
         const wasOnline = this.syncStatus.isOnline;
         this.syncStatus.isOnline = !!state.isConnected;
-        
+
         console.log(`📶 Network status changed: ${this.syncStatus.isOnline ? 'ONLINE' : 'OFFLINE'}`);
-        
+
         // If we came back online, process pending syncs
         if (!wasOnline && this.syncStatus.isOnline) {
           this.processPendingSyncs();
@@ -101,28 +97,69 @@ class CloudSyncService {
     }
 
     console.log(`📤 Processing ${this.pendingSyncQueue.length} pending syncs...`);
-    
+
     const batch = writeBatch(db);
     const processedItems: string[] = [];
 
     for (const pendingSync of this.pendingSyncQueue.slice()) {
       try {
+        // Skip invalid sync items
+        if (!pendingSync || !pendingSync.id || !pendingSync.operation) {
+          console.warn('⚠️ Skipping invalid pending sync item:', pendingSync);
+          continue;
+        }
+
         if (pendingSync.operation === 'create' || pendingSync.operation === 'update') {
+          // Skip if data is missing or invalid
+          if (!pendingSync.data || !pendingSync.data.uid) {
+            console.warn('⚠️ Skipping sync with invalid data:', pendingSync);
+            processedItems.push(pendingSync.id);
+            continue;
+          }
+
           const userRef = doc(db, 'users', pendingSync.data.uid);
+
+          // Normalize dates in pending sync data
+          const normalizedData: any = {};
+          Object.entries(pendingSync.data).forEach(([key, value]) => {
+            if (key === 'createdAt' && value) {
+              try {
+                const date = value instanceof Date ? value : new Date(value as string | number);
+                if (isNaN(date.getTime()) || date.getTime() < 0 || date.getTime() > 8640000000000000) {
+                  normalizedData[key] = new Date(); // Use current date as fallback
+                } else {
+                  normalizedData[key] = date;
+                }
+              } catch (error) {
+                console.warn(`Date normalization error in sync for ${key}:`, error);
+                normalizedData[key] = new Date();
+              }
+            } else {
+              normalizedData[key] = value;
+            }
+          });
+
           batch.set(userRef, {
-            ...pendingSync.data,
+            ...normalizedData,
             lastUpdated: serverTimestamp(),
             syncVersion: Date.now()
           }, { merge: true });
         } else if (pendingSync.operation === 'delete') {
+          // Ensure ID is valid for deletion
+          if (!pendingSync.id || typeof pendingSync.id !== 'string') {
+            console.warn('⚠️ Skipping delete with invalid ID:', pendingSync);
+            processedItems.push(pendingSync.id || 'invalid');
+            continue;
+          }
+
           const userRef = doc(db, 'users', pendingSync.id);
           batch.delete(userRef);
         }
-        
+
         processedItems.push(pendingSync.id);
       } catch (error) {
         console.error('Error preparing batch sync:', error);
-        
+
         // Increment retry count
         pendingSync.retryCount++;
         if (pendingSync.retryCount >= this.maxRetries) {
@@ -135,12 +172,12 @@ class CloudSyncService {
     try {
       await batch.commit();
       console.log(`✅ Batch sync completed: ${processedItems.length} items`);
-      
+
       // Remove processed items from queue
       this.pendingSyncQueue = this.pendingSyncQueue.filter(
-        item => !processedItems.includes(item.id)
+        item => item && item.id && !processedItems.includes(item.id)
       );
-      
+
       this.syncStatus.pendingChanges = this.pendingSyncQueue.length;
       this.syncStatus.lastError = null;
       this.syncStatus.retryCount = 0;
@@ -148,7 +185,7 @@ class CloudSyncService {
       console.error('Batch sync failed:', error);
       this.syncStatus.lastError = error instanceof Error ? error.message : 'Unknown error';
       this.syncStatus.retryCount++;
-      
+
       // Retry after delay
       setTimeout(() => this.processPendingSyncs(), this.retryDelay * this.syncStatus.retryCount);
     }
@@ -166,63 +203,85 @@ class CloudSyncService {
     // Remove existing entry for same ID to avoid duplicates
     this.pendingSyncQueue = this.pendingSyncQueue.filter(item => item.id !== pendingSync.id);
     this.pendingSyncQueue.push(pendingSync);
-    
+
     this.syncStatus.pendingChanges = this.pendingSyncQueue.length;
-    
+
     // If online, try to process immediately
     if (this.syncStatus.isOnline) {
       setTimeout(() => this.processPendingSyncs(), 100);
     }
   }
 
-  // Sync user data to cloud with improved error handling
+  // Sync user data to cloud with improved error handling and duplicate prevention
   async syncUserToCloud(user: User): Promise<void> {
     try {
       this.syncStatus.syncInProgress = true;
-      
+
       // Check network connectivity
       if (!this.syncStatus.isOnline) {
         console.log('📱 Offline: Adding to pending sync queue');
         this.addToPendingSync('update', user);
         return;
       }
-      
+
+      // Check if this user already exists in cloud to prevent duplicates
+      const existingUser = await this.getUserFromCloud(user.uid);
+      const isUpdate = existingUser !== null;
+
       const userRef = doc(db, 'users', user.uid);
-      
-      // Filter out undefined values for Firestore compatibility
-      const cleanUserData = Object.fromEntries(
-        Object.entries(user).filter(([_, value]) => value !== undefined)
-      );
-      
+
+      // Filter out undefined values and normalize dates for Firestore compatibility
+      const cleanUserData: any = {};
+      Object.entries(user).forEach(([key, value]) => {
+        if (value !== undefined) {
+          if (key === 'createdAt' && value) {
+            // Ensure createdAt is a valid Date object
+            try {
+              const date = value instanceof Date ? value : new Date(value);
+              if (isNaN(date.getTime()) || date.getTime() < 0 || date.getTime() > 8640000000000000) {
+                cleanUserData[key] = new Date(); // Use current date as fallback
+              } else {
+                cleanUserData[key] = date;
+              }
+            } catch (error) {
+              console.warn(`Date normalization error for ${key}:`, error);
+              cleanUserData[key] = new Date();
+            }
+          } else {
+            cleanUserData[key] = value;
+          }
+        }
+      });
+
       const userData = {
         ...cleanUserData,
         lastUpdated: serverTimestamp(),
         syncVersion: Date.now()
       };
-      
+
       await setDoc(userRef, userData, { merge: true });
-      
+
       // Also update the user lookup collection for username resolution
       try {
         await this.userLookupService.createUserLookup(user);
       } catch (lookupError) {
         console.warn('⚠️ Failed to update user lookup, continuing with main sync:', lookupError);
       }
-      
+
       // Also sync to local storage
       await AsyncStorage.setItem(`user_${user.uid}`, JSON.stringify(user));
-      
+
       // Remove from pending queue if it was there
       this.pendingSyncQueue = this.pendingSyncQueue.filter(item => item.id !== user.uid);
       this.syncStatus.pendingChanges = this.pendingSyncQueue.length;
-      
-      console.log('✅ User synced to cloud:', user.email);
+
+      console.log(`✅ User ${isUpdate ? 'updated' : 'created'} in cloud:`, user.email);
       this.syncStatus.lastError = null;
       this.syncStatus.retryCount = 0;
     } catch (error) {
       console.error('❌ Failed to sync user to cloud:', error);
       this.syncStatus.lastError = error instanceof Error ? error.message : 'Unknown sync error';
-      
+
       // Add to pending queue for retry
       this.addToPendingSync('update', user);
       throw error;
@@ -246,37 +305,37 @@ class CloudSyncService {
       const userRef = doc(db, 'users', uid);
       const userSnap = await Promise.race([
         getDoc(userRef),
-        new Promise<never>((_, reject) => 
+        new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('Timeout')), 10000)
         )
       ]);
-      
+
       if (userSnap.exists()) {
         const cloudUser = userSnap.data() as User;
-        
+
         // Update local storage with cloud data
         await AsyncStorage.setItem(`user_${uid}`, JSON.stringify(cloudUser));
-        
+
         console.log('✅ User retrieved from cloud:', cloudUser.email);
         return cloudUser;
       }
-      
+
       // Fallback to local storage
       const localData = await AsyncStorage.getItem(`user_${uid}`);
       if (localData) {
         const localUser = JSON.parse(localData) as User;
-        
+
         // Try to sync local data to cloud in background
         this.addToPendingSync('update', localUser);
-        
+
         return localUser;
       }
-      
+
       return null;
     } catch (error) {
       console.error('❌ Failed to get user from cloud:', error);
       this.syncStatus.lastError = error instanceof Error ? error.message : 'Unknown error';
-      
+
       // Fallback to local storage on error
       try {
         const localData = await AsyncStorage.getItem(`user_${uid}`);
@@ -297,21 +356,21 @@ class CloudSyncService {
     try {
       const usersRef = collection(db, 'users');
       const querySnapshot = await getDocs(usersRef);
-      
+
       const cloudUsers: User[] = [];
       querySnapshot.forEach((doc) => {
         cloudUsers.push(doc.data() as User);
       });
-      
+
       // Update local storage with cloud data
       for (const user of cloudUsers) {
         await AsyncStorage.setItem(`user_${user.uid}`, JSON.stringify(user));
       }
-      
+
       return cloudUsers;
     } catch (error) {
       console.error('Failed to get users from cloud:', error);
-      
+
       // Fallback to local storage
       try {
         const allKeys = await AsyncStorage.getAllKeys();
@@ -334,28 +393,28 @@ class CloudSyncService {
       const usersRef = collection(db, 'users');
       const q = query(usersRef, where('email', '==', email));
       const querySnapshot = await getDocs(q);
-      
+
       if (!querySnapshot.empty) {
         const userDoc = querySnapshot.docs[0];
         const cloudUser = userDoc.data() as User;
-        
+
         // Update local storage
         await AsyncStorage.setItem(`user_${cloudUser.uid}`, JSON.stringify(cloudUser));
-        
+
         return cloudUser;
       }
-      
+
       // Fallback to local search
       const allUsers = await this.getAllUsersFromCloud();
       return allUsers.find(user => user.email === email) || null;
     } catch (error) {
       console.error('Failed to get user by email from cloud:', error);
-      
+
       // Local fallback
       try {
         const allKeys = await AsyncStorage.getAllKeys();
         const userKeys = allKeys.filter(key => key.startsWith('user_'));
-        
+
         for (const key of userKeys) {
           const userData = await AsyncStorage.getItem(key);
           if (userData) {
@@ -377,22 +436,22 @@ class CloudSyncService {
     try {
       // First, get the email from the public lookup collection (no auth required)
       const email = await this.userLookupService.getEmailByUsername(username);
-      
+
       if (!email) {
         // Username not found in lookup
         return null;
       }
-      
+
       // Now get the full user data by email (this requires auth, but should work after login)
       return await this.getUserByEmailFromCloud(email);
     } catch (error) {
       console.error('Failed to get user by username from cloud:', error);
-      
+
       // Local fallback
       try {
         const allKeys = await AsyncStorage.getAllKeys();
         const userKeys = allKeys.filter(key => key.startsWith('user_'));
-        
+
         for (const key of userKeys) {
           const userData = await AsyncStorage.getItem(key);
           if (userData) {
@@ -423,26 +482,26 @@ class CloudSyncService {
       // Delete from cloud
       const userRef = doc(db, 'users', uid);
       await deleteDoc(userRef);
-      
+
       // Also delete from user lookup collection
       try {
         await this.userLookupService.deleteUserLookup(uid);
       } catch (lookupError) {
         console.warn('⚠️ Failed to delete user lookup, continuing with main deletion:', lookupError);
       }
-      
+
       // Delete from local
       await AsyncStorage.removeItem(`user_${uid}`);
-      
+
       // Remove from pending queue if it was there
       this.pendingSyncQueue = this.pendingSyncQueue.filter(item => item.id !== uid);
       this.syncStatus.pendingChanges = this.pendingSyncQueue.length;
-      
+
       console.log('✅ User deleted from cloud and local:', uid);
     } catch (error) {
       console.error('❌ Failed to delete user from cloud:', error);
       this.syncStatus.lastError = error instanceof Error ? error.message : 'Unknown delete error';
-      
+
       // Add to pending queue for retry
       this.addToPendingSync('delete', null, uid);
       throw error;
@@ -453,26 +512,26 @@ class CloudSyncService {
   setupRealtimeSync(uid: string, onUserUpdate: (user: User) => void): () => void {
     try {
       const userRef = doc(db, 'users', uid);
-      
-      const unsubscribe = onSnapshot(userRef, 
+
+      const unsubscribe = onSnapshot(userRef,
         (doc) => {
           if (doc.exists()) {
             const updatedUser = doc.data() as User;
-            
+
             // Update local storage
             AsyncStorage.setItem(`user_${uid}`, JSON.stringify(updatedUser))
               .catch(error => console.error('Failed to update local storage:', error));
-            
+
             // Notify about the update
             onUserUpdate(updatedUser);
-            
+
             console.log('🔄 Real-time user update received:', updatedUser.email);
           }
-        }, 
+        },
         (error) => {
           console.error('❌ Real-time sync error:', error);
           this.syncStatus.lastError = error.message;
-          
+
           // Try to reconnect after delay
           setTimeout(() => {
             console.log('🔄 Attempting to reconnect real-time sync...');
@@ -480,12 +539,12 @@ class CloudSyncService {
           }, 5000);
         }
       );
-      
+
       // Store the unsubscribe function for cleanup
       this.listeners.set(`realtime_${uid}`, unsubscribe);
-      
+
       console.log('📡 Real-time sync established for user:', uid);
-      
+
       return () => {
         unsubscribe();
         this.listeners.delete(`realtime_${uid}`);
@@ -494,27 +553,57 @@ class CloudSyncService {
     } catch (error) {
       console.error('❌ Failed to setup real-time sync:', error);
       this.syncStatus.lastError = error instanceof Error ? error.message : 'Unknown error';
-      
+
       // Return a no-op function
       return () => {};
     }
   }
 
-  // Sync all local data to cloud
+  // Sync all local data to cloud with duplicate prevention
   async syncAllLocalDataToCloud(): Promise<void> {
     try {
       this.syncStatus.syncInProgress = true;
-      
+
       const allKeys = await AsyncStorage.getAllKeys();
       const userKeys = allKeys.filter(key => key.startsWith('user_'));
-      
+
       let syncCount = 0;
-      
+      let skipCount = 0;
+      const seenEmails = new Set<string>();
+      const seenUsernames = new Set<string>();
+
       for (const key of userKeys) {
         try {
           const userData = await AsyncStorage.getItem(key);
           if (userData) {
             const user = JSON.parse(userData) as User;
+
+            // Skip if this email or username was already processed (duplicate prevention)
+            const emailLower = user.email.toLowerCase();
+            const usernameLower = user.username.toLowerCase();
+
+            if (seenEmails.has(emailLower) || seenUsernames.has(usernameLower)) {
+              console.warn(`⚠️ Skipping sync with duplicate email/username: ${user.email}/${user.username}`);
+              skipCount++;
+              continue;
+            }
+
+            // Check if user data looks valid
+            if (!user.email || !user.username || user.email.indexOf('@') === -1) {
+              console.warn('⚠️ Skipping sync with invalid data:', {
+                uid: user.uid,
+                email: user.email,
+                username: user.username,
+                hasValidEmail: user.email && user.email.indexOf('@') > -1
+              });
+              skipCount++;
+              continue;
+            }
+
+            // Record this email and username as seen
+            seenEmails.add(emailLower);
+            seenUsernames.add(usernameLower);
+
             await this.syncUserToCloud(user);
             syncCount++;
           }
@@ -522,8 +611,8 @@ class CloudSyncService {
           console.error(`Failed to sync user from key ${key}:`, error);
         }
       }
-      
-      console.log(`Synced ${syncCount} users to cloud`);
+
+      console.log(`Synced ${syncCount} users to cloud${skipCount > 0 ? `, skipped ${skipCount} duplicates` : ''}`);
     } catch (error) {
       console.error('Failed to sync all local data to cloud:', error);
       throw error;
@@ -537,20 +626,20 @@ class CloudSyncService {
   async forceRefreshFromCloud(): Promise<void> {
     try {
       this.syncStatus.syncInProgress = true;
-      
+
       // Get all users from cloud
       const cloudUsers = await this.getAllUsersFromCloud();
-      
+
       // Clear local storage
       const allKeys = await AsyncStorage.getAllKeys();
       const userKeys = allKeys.filter(key => key.startsWith('user_'));
       await AsyncStorage.multiRemove(userKeys);
-      
+
       // Save cloud data to local
       for (const user of cloudUsers) {
         await AsyncStorage.setItem(`user_${user.uid}`, JSON.stringify(user));
       }
-      
+
       console.log(`Refreshed ${cloudUsers.length} users from cloud`);
     } catch (error) {
       console.error('Failed to refresh from cloud:', error);
@@ -587,14 +676,14 @@ class CloudSyncService {
     try {
       // Get latest data from cloud
       const cloudUser = await this.getUserFromCloud(uid);
-      
+
       if (cloudUser) {
         // Setup real-time sync for this user
         this.setupRealtimeSync(uid, (updatedUser) => {
           console.log('User data updated in real-time:', updatedUser.email);
         });
       }
-      
+
       return cloudUser;
     } catch (error) {
       console.error('Failed to sync user on login:', error);
@@ -606,11 +695,11 @@ class CloudSyncService {
   startAutoRefresh(intervalMs: number = 30000): void {
     this.autoRefreshIntervalMs = intervalMs;
     this.syncStatus.autoRefreshEnabled = true;
-    
+
     if (this.autoRefreshInterval) {
       clearInterval(this.autoRefreshInterval);
     }
-    
+
     this.autoRefreshInterval = setInterval(async () => {
       if (this.syncStatus.autoRefreshEnabled && !this.syncStatus.syncInProgress && this.syncStatus.isOnline) {
         console.log('🔄 Auto-refresh: Syncing data...');
@@ -624,7 +713,7 @@ class CloudSyncService {
         console.log('📱 Auto-refresh skipped: Offline');
       }
     }, intervalMs);
-    
+
     this.updateNextRefreshTime();
     console.log(`✅ Auto-refresh enabled: Every ${intervalMs / 1000} seconds`);
   }
@@ -643,18 +732,21 @@ class CloudSyncService {
     try {
       this.syncStatus.syncInProgress = true;
       this.updateNextRefreshTime();
-      
+
       // First process any pending syncs
       await this.processPendingSyncs();
-      
+
       // Then refresh all user data from cloud
       const allUsers = await this.getAllUsersFromCloud();
-      
+
+      // Filter out users that were intentionally deleted
+      const filteredUsers = await this.filterDeletedUsers(allUsers);
+
       // Notify callbacks about data updates
       this.onDataUpdateCallbacks.forEach(callback => {
         try {
-          callback({ 
-            users: allUsers, 
+          callback({
+            users: filteredUsers,
             timestamp: new Date(),
             source: 'auto-refresh'
           });
@@ -662,7 +754,7 @@ class CloudSyncService {
           console.error('❌ Error in auto-refresh callback:', error);
         }
       });
-      
+
       this.syncStatus.lastSync = new Date();
       this.syncStatus.lastError = null;
       console.log(`✅ Auto-refresh completed: ${allUsers.length} users refreshed`);
@@ -676,6 +768,31 @@ class CloudSyncService {
     }
   }
 
+  // Filter out users that were intentionally deleted
+  private async filterDeletedUsers(users: User[]): Promise<User[]> {
+    try {
+      // Import the deletion log utility
+      const { UserDeletionSyncFix } = await import('../utils/fixUserDeletionSync');
+      const deletionLog = await UserDeletionSyncFix.getDeletionLog();
+
+      if (deletionLog.length === 0) {
+        return users;
+      }
+
+      const deletedUids = new Set(deletionLog.map(entry => entry.uid));
+      const filteredUsers = users.filter(user => !deletedUids.has(user.uid));
+
+      if (filteredUsers.length !== users.length) {
+        console.log(`🚫 Filtered out ${users.length - filteredUsers.length} deleted users from auto-refresh`);
+      }
+
+      return filteredUsers;
+    } catch (error) {
+      console.error('Error filtering deleted users:', error);
+      return users; // Return all users if filtering fails
+    }
+  }
+
   private updateNextRefreshTime(): void {
     if (this.syncStatus.autoRefreshEnabled) {
       this.syncStatus.nextRefresh = new Date(Date.now() + this.autoRefreshIntervalMs);
@@ -685,7 +802,7 @@ class CloudSyncService {
   // Register callback for data updates
   onDataUpdate(callback: (data: any) => void): () => void {
     this.onDataUpdateCallbacks.add(callback);
-    
+
     // Return unsubscribe function
     return () => {
       this.onDataUpdateCallbacks.delete(callback);
@@ -693,11 +810,11 @@ class CloudSyncService {
   }
 
   // Get auto-refresh status
-  getAutoRefreshStatus(): { 
-    enabled: boolean; 
-    interval: number; 
-    nextRefresh: Date | null; 
-    lastRefresh: Date 
+  getAutoRefreshStatus(): {
+    enabled: boolean;
+    interval: number;
+    nextRefresh: Date | null;
+    lastRefresh: Date
   } {
     return {
       enabled: this.syncStatus.autoRefreshEnabled,
@@ -732,13 +849,13 @@ class CloudSyncService {
       }
     });
     this.listeners.clear();
-    
+
     // Stop auto-refresh
     this.stopAutoRefresh();
-    
+
     // Clear data update callbacks
     this.onDataUpdateCallbacks.clear();
-    
+
     // Unsubscribe from network monitoring
     if (this.netInfoUnsubscribe) {
       try {
@@ -748,17 +865,17 @@ class CloudSyncService {
         console.error('Error during network monitoring cleanup:', error);
       }
     }
-    
+
     // Clear pending sync queue
     this.pendingSyncQueue = [];
     this.syncStatus.pendingChanges = 0;
-    
+
     console.log('🧹 CloudSyncService cleanup completed');
   }
 
   // Get comprehensive sync status
   getSyncStatus(): SyncStatus {
-    return { 
+    return {
       ...this.syncStatus,
       pendingChanges: this.pendingSyncQueue.length
     };

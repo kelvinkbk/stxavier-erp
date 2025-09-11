@@ -1,0 +1,154 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Icon Generator - St. Xavier ERP</title>
+    <style>
+        body { 
+            font-family: Arial, sans-serif; 
+            display: flex; 
+            justify-content: center; 
+            align-items: center; 
+            min-height: 100vh; 
+            margin: 0;
+            background: #f0f0f0;
+        }
+        .icon-container {
+            text-align: center;
+            background: white;
+            padding: 40px;
+            border-radius: 12px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+        }
+        .icon-preview {
+            width: 512px;
+            height: 512px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            border-radius: 24px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            margin-bottom: 20px;
+            box-shadow: 0 8px 32px rgba(0,0,0,0.2);
+        }
+        .icon-text {
+            font-size: 72px;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .icon-subtitle {
+            font-size: 28px;
+            opacity: 0.9;
+            text-shadow: 1px 1px 2px rgba(0,0,0,0.3);
+        }
+        button {
+            background: #667eea;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px;
+        }
+        button:hover {
+            background: #5a6fd8;
+        }
+        #instructions {
+            max-width: 600px;
+            margin-top: 20px;
+            text-align: left;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            border-left: 4px solid #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="icon-container">
+        <div class="icon-preview" id="iconPreview">
+            <div class="icon-text">📚</div>
+            <div class="icon-subtitle">St. Xavier</div>
+        </div>
+        
+        <button onclick="downloadIcon('icon')">Download Main Icon (512x512)</button>
+        <button onclick="downloadIcon('adaptive')">Download Adaptive Icon (512x512)</button>
+        
+        <div id="instructions">
+            <h3>📋 Instructions to fix the Expo Doctor error:</h3>
+            <ol>
+                <li><strong>Download both icons</strong> using the buttons above</li>
+                <li><strong>Replace the files</strong> in your assets folder:
+                    <ul>
+                        <li>Save the first download as <code>icon.png</code></li>
+                        <li>Save the second download as <code>adaptive-icon.png</code></li>
+                    </ul>
+                </li>
+                <li><strong>Run expo-doctor again</strong>: <code>npx expo-doctor</code></li>
+                <li>All checks should now pass! ✅</li>
+            </ol>
+            
+            <p><strong>Note:</strong> These are perfectly square 512x512 icons that will resolve the Expo validation error.</p>
+        </div>
+    </div>
+
+    <script>
+        function downloadIcon(type) {
+            const canvas = document.createElement('canvas');
+            canvas.width = 512;
+            canvas.height = 512;
+            const ctx = canvas.getContext('2d');
+            
+            // Create gradient background
+            const gradient = ctx.createLinearGradient(0, 0, 512, 512);
+            gradient.addColorStop(0, '#667eea');
+            gradient.addColorStop(1, '#764ba2');
+            
+            // Fill background
+            ctx.fillStyle = gradient;
+            ctx.fillRect(0, 0, 512, 512);
+            
+            // Add rounded corners effect
+            ctx.globalCompositeOperation = 'destination-in';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, 512, 512, 24);
+            ctx.fill();
+            ctx.globalCompositeOperation = 'source-over';
+            
+            // Add text
+            ctx.fillStyle = 'white';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            
+            // Add emoji/icon
+            ctx.font = 'bold 120px Arial';
+            ctx.fillText('📚', 256, 200);
+            
+            // Add text
+            ctx.font = 'bold 48px Arial';
+            ctx.fillText('St. Xavier', 256, 320);
+            
+            // Add shadow effect
+            ctx.shadowColor = 'rgba(0,0,0,0.3)';
+            ctx.shadowBlur = 10;
+            ctx.shadowOffsetX = 2;
+            ctx.shadowOffsetY = 2;
+            
+            // Download
+            canvas.toBlob(function(blob) {
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = type === 'icon' ? 'icon.png' : 'adaptive-icon.png';
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            });
+        }
+    </script>
+</body>
+</html>

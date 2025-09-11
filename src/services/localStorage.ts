@@ -6,12 +6,89 @@ import CloudSyncService from './CloudSyncService';
 export class LocalStorageService {
   private static cloudSync = CloudSyncService.getInstance();
 
+  // Utility function to normalize dates when loading from storage
+  static normalizeUserDates(user: any): User {
+    if (user && user.createdAt) {
+      try {
+        if (typeof user.createdAt === 'string') {
+          const parsedDate = new Date(user.createdAt);
+          if (isNaN(parsedDate.getTime()) || parsedDate.getTime() < 0 || parsedDate.getTime() > 8640000000000000) {
+            // Invalid date or out of bounds, use current date
+            user.createdAt = new Date();
+          } else {
+            user.createdAt = parsedDate;
+          }
+        } else if (user.createdAt instanceof Date) {
+          // Validate existing Date object
+          if (isNaN(user.createdAt.getTime()) || user.createdAt.getTime() < 0 || user.createdAt.getTime() > 8640000000000000) {
+            user.createdAt = new Date();
+          }
+        } else if (typeof user.createdAt === 'number') {
+          // Handle timestamp
+          const parsedDate = new Date(user.createdAt);
+          if (isNaN(parsedDate.getTime()) || parsedDate.getTime() < 0 || parsedDate.getTime() > 8640000000000000) {
+            user.createdAt = new Date();
+          } else {
+            user.createdAt = parsedDate;
+          }
+        } else {
+          // Invalid type, use current date
+          user.createdAt = new Date();
+        }
+      } catch (error) {
+        console.warn('Date normalization error:', error);
+        user.createdAt = new Date();
+      }
+    } else if (user) {
+      // No createdAt field, add one
+      user.createdAt = new Date();
+    }
+    return user as User;
+  }
+
+  // Utility function to safely convert any date-like value to Date
+  static safeParseDate(dateValue: any): Date {
+    if (!dateValue) return new Date();
+
+    try {
+      if (dateValue instanceof Date) {
+        // Validate existing Date object
+        if (isNaN(dateValue.getTime()) || dateValue.getTime() < 0 || dateValue.getTime() > 8640000000000000) {
+          return new Date();
+        }
+        return dateValue;
+      }
+
+      if (typeof dateValue === 'string' || typeof dateValue === 'number') {
+        const parsed = new Date(dateValue);
+        // Check if date is valid and within reasonable bounds
+        if (isNaN(parsed.getTime()) || parsed.getTime() < 0 || parsed.getTime() > 8640000000000000) {
+          return new Date();
+        }
+        return parsed;
+      }
+
+      // Handle Firebase Timestamp objects
+      if (dateValue && typeof dateValue === 'object' && dateValue.seconds) {
+        const parsed = new Date(dateValue.seconds * 1000);
+        if (isNaN(parsed.getTime()) || parsed.getTime() < 0 || parsed.getTime() > 8640000000000000) {
+          return new Date();
+        }
+        return parsed;
+      }
+    } catch (error) {
+      console.warn('Date parsing error:', error);
+    }
+
+    return new Date();
+  }
+
   // Enhanced user data storage with cloud sync
   static async saveUser(uid: string, userData: User): Promise<void> {
     try {
       // Save to local storage first
       await AsyncStorage.setItem(`user_${uid}`, JSON.stringify(userData));
-      
+
       // Then sync to cloud
       try {
         await this.cloudSync.syncUserToCloud(userData);
@@ -31,18 +108,26 @@ export class LocalStorageService {
       // Try to get from cloud first (ensures latest data)
       const cloudUser = await this.cloudSync.getUserFromCloud(uid);
       if (cloudUser) {
-        return cloudUser;
+        return this.normalizeUserDates(cloudUser);
       }
-      
+
       // Fallback to local storage
       const userData = await AsyncStorage.getItem(`user_${uid}`);
-      return userData ? JSON.parse(userData) : null;
+      if (userData) {
+        const parsedUser = JSON.parse(userData);
+        return this.normalizeUserDates(parsedUser);
+      }
+      return null;
     } catch (error) {
       console.error('Error getting user data:', error);
       // Final fallback to local only
       try {
         const userData = await AsyncStorage.getItem(`user_${uid}`);
-        return userData ? JSON.parse(userData) : null;
+        if (userData) {
+          const parsedUser = JSON.parse(userData);
+          return this.normalizeUserDates(parsedUser);
+        }
+        return null;
       } catch {
         return null;
       }
@@ -63,17 +148,22 @@ export class LocalStorageService {
   static async getAllUsers(): Promise<User[]> {
     try {
       // Get from cloud first to ensure latest data
-      return await this.cloudSync.getAllUsersFromCloud();
+      const cloudUsers = await this.cloudSync.getAllUsersFromCloud();
+      return cloudUsers.map(user => this.normalizeUserDates(user));
     } catch (error) {
       console.error('Error getting users from cloud, using local:', error);
-      
+
       // Fallback to local storage
       try {
         const allKeys = await AsyncStorage.getAllKeys();
         const userKeys = allKeys.filter(key => key.startsWith('user_'));
         const userPromises = userKeys.map(async (key) => {
           const userData = await AsyncStorage.getItem(key);
-          return userData ? JSON.parse(userData) : null;
+          if (userData) {
+            const parsedUser = JSON.parse(userData);
+            return this.normalizeUserDates(parsedUser);
+          }
+          return null;
         });
         const users = await Promise.all(userPromises);
         return users.filter(user => user !== null);
@@ -91,7 +181,7 @@ export class LocalStorageService {
       return await this.cloudSync.getUserByUsernameFromCloud(username);
     } catch (error) {
       console.error('Error getting user by username from cloud:', error);
-      
+
       // Fallback to local search
       try {
         const allUsers = await this.getAllUsers();
@@ -109,7 +199,7 @@ export class LocalStorageService {
       return await this.cloudSync.getUserByEmailFromCloud(email);
     } catch (error) {
       console.error('Error getting user by email from cloud:', error);
-      
+
       // Fallback to local search
       try {
         const allUsers = await this.getAllUsers();
@@ -127,7 +217,7 @@ export class LocalStorageService {
       return await this.cloudSync.isUsernameAvailableInCloud(username);
     } catch (error) {
       console.error('Error checking username availability in cloud:', error);
-      
+
       // Fallback to local check
       try {
         const user = await this.getUserByUsername(username);

@@ -1,0 +1,38 @@
+# Dependencies
+node_modules/
+.expo/
+dist/
+build/
+web-build/
+
+# Generated files
+*.d.ts
+coverage/
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Config files
+.env
+.env.*
+*.config.js
+*.config.ts
+
+# Logs
+*.log
+logs/
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Git
+.git/
+
+# Expo
+.expo-shared/

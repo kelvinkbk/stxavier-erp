@@ -18,7 +18,6 @@ import StudentService from '../../services/studentService';
 import { markAttendance, getClassAttendance } from '../../services/attendance';
 import { useAuth } from '../../utils/AuthContext';
 import { formatDate } from '../../utils/helpers';
-import { DebugAuth } from '../../services/debugAuth';
 
 interface AttendanceRecord {
   student: Student;
@@ -132,11 +131,6 @@ export default function AttendanceScreen() {
     } finally {
       setSubmitting(false);
     }
-  };
-
-  const debugAuth = async () => {
-    await DebugAuth.checkCurrentAuth();
-    await DebugAuth.createTestAttendance();
   };
 
   const markAllPresent = () => {
@@ -282,12 +276,6 @@ export default function AttendanceScreen() {
           >
             <Text style={styles.quickButtonText}>Mark All Absent</Text>
           </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.quickButton, styles.debugButton]}
-            onPress={debugAuth}
-          >
-            <Text style={styles.quickButtonText}>Debug Auth</Text>
-          </TouchableOpacity>
         </View>
       </Card>
 
@@ -388,9 +376,6 @@ const styles = StyleSheet.create({
   },
   absentAllButton: {
     backgroundColor: '#f44336',
-  },
-  debugButton: {
-    backgroundColor: '#9c27b0',
   },
   quickButtonText: {
     color: '#fff',

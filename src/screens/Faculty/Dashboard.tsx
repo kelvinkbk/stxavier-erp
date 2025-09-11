@@ -1,88 +1,193 @@
 // src/screens/Faculty/Dashboard.tsx
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView } from 'react-native';
+import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../utils/AuthContext';
-import { Button } from '../../components/Button';
-import { Card } from '../../components/Card';
+import { NavigationDebug } from '../../utils/navigationDebug';
+import { UniversalAlert } from '../../utils/universalAlert';
+
+interface FacultyFeature {
+  title: string;
+  description: string;
+  icon: string;
+  color: string;
+  onPress: () => void;
+}
 
 interface DashboardCardProps {
   title: string;
   description: string;
+  icon: string;
+  color: string;
   onPress: () => void;
 }
 
-const DashboardCard = ({ title, description, onPress }: DashboardCardProps) => (
-  <Card style={styles.card}>
-    <Text style={styles.cardTitle}>{title}</Text>
-    <Text style={styles.cardDescription}>{description}</Text>
-    <Button 
-      title="Open" 
-      onPress={onPress} 
-      variant="secondary" 
-      style={styles.cardButton}
-    />
-  </Card>
+const DashboardCard = ({ title, description, icon, color, onPress }: DashboardCardProps) => (
+  <TouchableOpacity
+    style={[styles.modernCard, { borderLeftColor: color }]}
+    onPress={onPress}
+    activeOpacity={0.8}
+  >
+    <View style={styles.cardHeader}>
+      <View style={[styles.iconContainer, { backgroundColor: `${color}15` }]}>
+        <Text style={[styles.cardIcon, { color: color }]}>{icon}</Text>
+      </View>
+      <View style={styles.cardContent}>
+        <Text style={styles.modernCardTitle}>{title}</Text>
+        <Text style={styles.modernCardDescription}>{description}</Text>
+      </View>
+    </View>
+    <View style={styles.cardArrow}>
+      <Text style={styles.arrowText}>›</Text>
+    </View>
+  </TouchableOpacity>
+);
+
+const QuickStatCard = ({ title, value, color }: { title: string; value: string; color: string }) => (
+  <View style={styles.statCard}>
+    <Text style={[styles.statValue, { color: color }]}>{value}</Text>
+    <Text style={styles.statTitle}>{title}</Text>
+  </View>
 );
 
 export default function FacultyDashboard({ navigation }: { navigation: any }) {
   const { user, signOut } = useAuth();
 
-  const facultyFeatures = [
+  const facultyFeatures: FacultyFeature[] = [
     {
       title: 'Mark Attendance',
       description: 'Mark attendance for your classes',
-      onPress: () => navigation.navigate('Attendance'),
+      icon: '✓',
+      color: '#10b981',
+      onPress: () => {
+        if (!NavigationDebug.safeNavigate(navigation, 'Attendance')) {
+          UniversalAlert.error(
+            'Unable to open Attendance screen. Please check that the screen is properly configured.'
+          );
+        }
+      },
+    },
+    {
+      title: 'My Timetable',
+      description: 'View and manage your class schedule',
+      icon: '📅',
+      color: '#3b82f6',
+      onPress: () => {
+        if (!NavigationDebug.safeNavigate(navigation, 'Timetable')) {
+          UniversalAlert.error(
+            'Unable to open Timetable screen. Please check that the screen is properly configured.'
+          );
+        }
+      },
     },
     {
       title: 'View Students',
       description: 'View students in your classes',
-      onPress: () => console.log('View Students'),
-    },
-    {
-      title: 'My Timetable',
-      description: 'View your class schedule',
-      onPress: () => console.log('My Timetable'),
+      icon: '👥',
+      color: '#8b5cf6',
+      onPress: () => {
+        // Navigate to Students screen - implement view students functionality
+        if (!NavigationDebug.safeNavigate(navigation, 'Students')) {
+          // If Students screen doesn't exist, show a temporary alert
+          UniversalAlert.info(
+            'Students List',
+            'Viewing students in your classes. This will show a list of all enrolled students with their details, attendance records, and performance metrics.'
+          );
+        }
+      },
     },
     {
       title: 'Attendance Reports',
       description: 'View attendance reports for your classes',
-      onPress: () => console.log('Attendance Reports'),
+      icon: '📊',
+      color: '#f59e0b',
+      onPress: () => {
+        // Navigate to Attendance Reports screen
+        if (!NavigationDebug.safeNavigate(navigation, 'AttendanceReports')) {
+          // Show attendance reports functionality
+          UniversalAlert.info(
+            'Attendance Reports',
+            'This will display comprehensive attendance reports including daily, weekly, and monthly summaries for all your classes. You can view attendance trends and generate reports for students.'
+          );
+        }
+      },
     },
     {
       title: 'Exam Management',
       description: 'Create exams and enter marks',
-      onPress: () => console.log('Exam Management'),
+      icon: '📝',
+      color: '#ef4444',
+      onPress: () => {
+        // Navigate to Exam Management screen
+        if (!NavigationDebug.safeNavigate(navigation, 'ExamManagement')) {
+          // Show exam management functionality
+          UniversalAlert.info(
+            'Exam Management',
+            'This section allows you to create, schedule, and manage examinations. You can set exam dates, create question papers, assign grades, and publish results for your subjects.'
+          );
+        }
+      },
     },
     {
       title: 'Student Performance',
       description: 'View student performance analytics',
-      onPress: () => console.log('Student Performance'),
+      icon: '📈',
+      color: '#06b6d4',
+      onPress: () => {
+        // Navigate to Student Performance screen
+        if (!NavigationDebug.safeNavigate(navigation, 'StudentPerformance')) {
+          // Show student performance functionality
+          UniversalAlert.info(
+            'Student Performance',
+            'View detailed performance analytics for your students including grades, assignment scores, test results, and progress tracking. Generate performance reports and identify students who need additional support.'
+          );
+        }
+      },
     },
   ];
 
   return (
-    <ScrollView style={styles.container}>
-      <View style={styles.header}>
-        <Text style={styles.welcomeText}>Welcome, {user?.name}</Text>
-        <Text style={styles.roleText}>Faculty</Text>
-        <Text style={styles.departmentText}>{user?.department}</Text>
-        <Button 
-          title="Sign Out" 
-          onPress={signOut} 
-          variant="secondary" 
-          style={styles.signOutButton}
-        />
+    <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
+      {/* Modern Header */}
+      <View style={styles.modernHeader}>
+        <View style={styles.headerContent}>
+          <View style={styles.userInfo}>
+            <Text style={styles.welcomeText}>Good day,</Text>
+            <Text style={styles.userName}>{user?.name}</Text>
+            <View style={styles.userDetails}>
+              <Text style={styles.roleText}>Faculty</Text>
+              <Text style={styles.departmentText}>{user?.department}</Text>
+            </View>
+          </View>
+          <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
+            <Text style={styles.signOutText}>Sign Out</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
-      <View style={styles.grid}>
-        {facultyFeatures.map((feature, index) => (
-          <DashboardCard
-            key={index}
-            title={feature.title}
-            description={feature.description}
-            onPress={feature.onPress}
-          />
-        ))}
+      {/* Quick Stats Section */}
+      <View style={styles.statsContainer}>
+        <Text style={styles.sectionTitle}>Quick Overview</Text>
+        <View style={styles.statsRow}>
+          <QuickStatCard title="Classes Today" value="4" color="#10b981" />
+          <QuickStatCard title="Total Students" value="120" color="#3b82f6" />
+          <QuickStatCard title="Pending Grades" value="8" color="#f59e0b" />
+        </View>
+      </View>
+
+      {/* Services Section */}
+      <View style={styles.servicesContainer}>
+        <Text style={styles.sectionTitle}>Faculty Services</Text>
+        <View style={styles.modernGrid}>
+          {facultyFeatures.map((feature, index) => (
+            <DashboardCard
+              key={index}
+              title={feature.title}
+              description={feature.description}
+              icon={feature.icon}
+              color={feature.color}
+              onPress={feature.onPress}
+            />
+          ))}
+        </View>
       </View>
     </ScrollView>
   );
@@ -91,51 +196,153 @@ export default function FacultyDashboard({ navigation }: { navigation: any }) {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#f5f5f5',
+    backgroundColor: '#f8fafc',
   },
-  header: {
-    backgroundColor: '#388e3c',
-    padding: 24,
-    alignItems: 'center',
+  scrollContent: {
+    paddingBottom: 20,
+  },
+  modernHeader: {
+    backgroundColor: '#059669',
+    paddingTop: 60,
+    paddingBottom: 30,
+    paddingHorizontal: 20,
+  },
+  headerContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'flex-start',
+  },
+  userInfo: {
+    flex: 1,
   },
   welcomeText: {
-    fontSize: 24,
-    fontWeight: 'bold',
-    color: 'white',
+    fontSize: 16,
+    color: '#d1fae5',
     marginBottom: 4,
   },
+  userName: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: 'white',
+    marginBottom: 8,
+  },
+  userDetails: {
+    flexDirection: 'row',
+    gap: 16,
+  },
   roleText: {
-    fontSize: 16,
-    color: '#c8e6c9',
-    marginBottom: 4,
+    fontSize: 14,
+    color: '#a7f3d0',
   },
   departmentText: {
     fontSize: 14,
-    color: '#c8e6c9',
-    marginBottom: 16,
+    color: '#a7f3d0',
   },
   signOutButton: {
-    backgroundColor: 'rgba(255,255,255,0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
   },
-  grid: {
-    padding: 16,
+  signOutText: {
+    color: 'white',
+    fontSize: 14,
+    fontWeight: '600',
   },
-  card: {
+  statsContainer: {
+    padding: 20,
+    paddingTop: 30,
+  },
+  sectionTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1a202c',
     marginBottom: 16,
   },
-  cardTitle: {
-    fontSize: 18,
+  statsRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  statCard: {
+    flex: 1,
+    backgroundColor: 'white',
+    padding: 20,
+    borderRadius: 12,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statValue: {
+    fontSize: 24,
     fontWeight: 'bold',
-    color: '#333',
-    marginBottom: 8,
+    marginBottom: 4,
   },
-  cardDescription: {
-    fontSize: 14,
-    color: '#666',
-    lineHeight: 20,
+  statTitle: {
+    fontSize: 12,
+    color: '#6b7280',
+    textAlign: 'center',
+  },
+  servicesContainer: {
+    padding: 20,
+  },
+  modernGrid: {
+    gap: 12,
+  },
+  modernCard: {
+    backgroundColor: 'white',
+    borderRadius: 12,
+    padding: 16,
     marginBottom: 12,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderLeftWidth: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
-  cardButton: {
-    alignSelf: 'flex-start',
+  cardHeader: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 16,
+  },
+  cardIcon: {
+    fontSize: 20,
+  },
+  cardContent: {
+    flex: 1,
+  },
+  modernCardTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#1a202c',
+    marginBottom: 2,
+  },
+  modernCardDescription: {
+    fontSize: 14,
+    color: '#6b7280',
+    lineHeight: 20,
+  },
+  cardArrow: {
+    marginLeft: 12,
+  },
+  arrowText: {
+    fontSize: 18,
+    color: '#9ca3af',
   },
 });

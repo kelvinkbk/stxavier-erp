@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
   TextInput,
   Modal,
   Switch,
@@ -19,12 +18,19 @@ import SecurityService from '../services/SecurityService';
 import PerformanceMonitor from '../services/PerformanceMonitor';
 import MigrationService from '../services/MigrationService';
 import { LocalStorageService } from '../services/localStorage';
+import { UniversalAlert } from '../utils/universalAlert';
 import SyncStatusComponent from '../components/SyncStatusComponent';
 import AutoRefreshSettings from '../components/AutoRefreshSettings';
 import SyncDebugPanel from '../components/SyncDebugPanel';
 import { User } from '../types';
+import { useAuth } from '../utils/AuthContext';
 
-const AdminDashboard: React.FC = () => {
+interface AdminDashboardProps {
+  navigation?: any;
+}
+
+const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
+  const { user, signOut } = useAuth();
   const [stats, setStats] = useState<UserStats | null>(null);
   const [users, setUsers] = useState<User[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<User[]>([]);
@@ -85,7 +91,7 @@ const AdminDashboard: React.FC = () => {
       setUsers(allUsers);
       setFilteredUsers(allUsers);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load dashboard data');
+      UniversalAlert.error('Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -103,7 +109,7 @@ const AdminDashboard: React.FC = () => {
 
   const handleBulkImport = async () => {
     if (!csvData.trim()) {
-      Alert.alert('Error', 'Please enter CSV data');
+      UniversalAlert.error('Please enter CSV data');
       return;
     }
 
@@ -111,9 +117,8 @@ const AdminDashboard: React.FC = () => {
     try {
       const result = await AdvancedUserService.importUsersFromCSVAdvanced(csvData);
       
-      Alert.alert(
-        'Import Complete',
-        `Success: ${result.success}\nFailed: ${result.failed}\n\n${
+      UniversalAlert.success(
+        `Import Complete!\n\nSuccess: ${result.success}\nFailed: ${result.failed}\n\n${
           result.errors.length > 0 
             ? `Errors:\n${result.errors.slice(0, 3).map(e => `Row ${e.row}: ${e.error}`).join('\n')}`
             : 'All users imported successfully!'
@@ -124,7 +129,7 @@ const AdminDashboard: React.FC = () => {
       setCsvData('');
       loadInitialData();
     } catch (error) {
-      Alert.alert('Error', 'Failed to import users');
+      UniversalAlert.error('Failed to import users');
     } finally {
       setLoading(false);
     }
@@ -132,40 +137,68 @@ const AdminDashboard: React.FC = () => {
 
   const handleCreateUser = async () => {
     if (!newUserData.name || !newUserData.email || !newUserData.username || !newUserData.password) {
-      Alert.alert('Error', 'Please fill in all required fields');
+      UniversalAlert.error('Please fill in all required fields');
       return;
     }
 
     if (newUserData.password.length < 6) {
-      Alert.alert('Error', 'Password must be at least 6 characters');
+      UniversalAlert.error('Password must be at least 6 characters');
       return;
     }
 
     // Check username availability
     const isUsernameAvailable = await LocalStorageService.isUsernameAvailable(newUserData.username);
     if (!isUsernameAvailable) {
-      Alert.alert('Error', 'Username is already taken');
+      UniversalAlert.error('Username is already taken');
       return;
     }
 
     setLoading(true);
     try {
-      // Create user with Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, newUserData.email, newUserData.password);
-      const firebaseUser = userCredential.user;
+      // ⚡ TEMPORARY FIX: Create user locally only (bypassing Firebase 400 error)
+      // TODO: Enable Email/Password authentication in Firebase Console to remove this workaround
+      
+      let firebaseUser;
+      let userData: User;
+      
+      try {
+        // Try Firebase creation first
+        const userCredential = await createUserWithEmailAndPassword(auth, newUserData.email, newUserData.password);
+        firebaseUser = userCredential.user;
+        
+        userData = {
+          uid: firebaseUser.uid,
+          name: newUserData.name,
+          email: newUserData.email,
+          username: newUserData.username,
+          role: newUserData.role,
+          department: newUserData.department || undefined,
+          regNo: newUserData.regNo || undefined,
+          createdAt: new Date(),
+        };
+      } catch (firebaseError: any) {
+        console.log('Firebase creation failed, creating locally only:', firebaseError.message);
+        
+        // Create user locally with generated UID
+        const localUID = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        
+        userData = {
+          uid: localUID,
+          name: newUserData.name,
+          email: newUserData.email,
+          username: newUserData.username,
+          role: newUserData.role,
+          department: newUserData.department || undefined,
+          regNo: newUserData.regNo || undefined,
+          createdAt: new Date(),
+        };
+        
+        UniversalAlert.info(
+          'Created Locally - User created in local storage only. Enable Firebase Email/Password authentication for cloud sync.'
+        );
+      }
 
-      const userData: User = {
-        uid: firebaseUser.uid,
-        name: newUserData.name,
-        email: newUserData.email,
-        username: newUserData.username,
-        role: newUserData.role,
-        department: newUserData.department || undefined,
-        regNo: newUserData.regNo || undefined,
-        createdAt: new Date(),
-      };
-
-      await LocalStorageService.saveUser(firebaseUser.uid, userData);
+      await LocalStorageService.saveUser(userData.uid, userData);
       
       // Security log
       const securityService = SecurityService.getInstance();
@@ -180,7 +213,7 @@ const AdminDashboard: React.FC = () => {
         }
       });
       
-      Alert.alert('Success', `User account created successfully for ${newUserData.name}`);
+      UniversalAlert.success(`User account created successfully for ${newUserData.name}`);
       
       // Reset form
       setNewUserData({
@@ -196,54 +229,55 @@ const AdminDashboard: React.FC = () => {
       setShowCreateUser(false);
       loadInitialData();
     } catch (error: any) {
-      Alert.alert('Error', error.message || 'Failed to create user account');
+      UniversalAlert.error(error.message || 'Failed to create user account');
     } finally {
       setLoading(false);
     }
   };
 
   const handleRunMigrations = async () => {
-    Alert.alert(
+    UniversalAlert.confirm(
       'Run Database Migrations',
       'This will update the database structure for improved performance. This may take a few minutes.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Run Migrations',
-          style: 'default',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              const migrationService = MigrationService.getInstance();
-              await migrationService.runMigrations();
-              Alert.alert('Success', 'Database migrations completed successfully');
-            } catch (error) {
-              Alert.alert('Error', 'Failed to run migrations. Please try again or contact support.');
-              console.error('Migration error:', error);
-            } finally {
-              setLoading(false);
-            }
-          }
+      async () => {
+        setLoading(true);
+        try {
+          const migrationService = MigrationService.getInstance();
+          await migrationService.runMigrations();
+          UniversalAlert.success('Database migrations completed successfully');
+        } catch (error) {
+          UniversalAlert.error('Failed to run migrations. Please try again or contact support.');
+          console.error('Migration error:', error);
+        } finally {
+          setLoading(false);
         }
-      ]
+      }
     );
   };
 
   const exportUsers = async () => {
     try {
+      setLoading(true);
+      
       const filter: UserFilter = {
         searchTerm: searchTerm || undefined,
         role: selectedRole || undefined
       };
       
+      console.log('📊 Starting user export with filter:', filter);
       const exported = await AdvancedUserService.exportUsersAdvanced(filter);
       
-      Alert.alert(
-        'Export Complete',
-        `Exported ${filteredUsers.length} users\n\nCSV Length: ${exported.csv.length} characters\nJSON Length: ${exported.json.length} characters`
+      console.log('✅ Export completed successfully');
+      UniversalAlert.success(
+        `Export Complete!\n\nSuccessfully exported ${filteredUsers.length} users!\n\n📋 CSV: ${exported.csv.length} characters\n📄 JSON: ${exported.json.length} characters\n\n📅 Export timestamp: ${new Date().toLocaleString()}`
       );
-    } catch (error) {
-      Alert.alert('Error', 'Failed to export users');
+    } catch (error: any) {
+      console.error('❌ Export failed:', error);
+      UniversalAlert.error(
+        `Export Failed!\n\nError details: ${error.message || 'Unknown error occurred'}\n\nPlease check the console for more details.`
+      );
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -254,7 +288,7 @@ const AdminDashboard: React.FC = () => {
       setPerformanceData(data);
       setShowPerformanceStats(true);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load performance data');
+      UniversalAlert.error('Failed to load performance data');
     }
   };
 
@@ -265,36 +299,35 @@ const AdminDashboard: React.FC = () => {
       setSecurityLogs(logs);
       setShowSecurityLogs(true);
     } catch (error) {
-      Alert.alert('Error', 'Failed to load security logs');
+      UniversalAlert.error('Failed to load security logs');
     }
   };
 
   const testNetworkPerformance = async () => {
     try {
       const monitor = PerformanceMonitor.getInstance();
-      Alert.alert('Info', 'Testing network performance...');
+      UniversalAlert.info('Testing network performance...');
       const result = await monitor.testNetworkPerformance();
       
       if (result) {
-        Alert.alert(
-          'Network Test Result',
-          `Latency: ${result.latency}ms\nConnection Type: ${result.connectionType}`
+        UniversalAlert.success(
+          `Network Test Result\n\nLatency: ${result.latency}ms\nConnection Type: ${result.connectionType}`
         );
       } else {
-        Alert.alert('Error', 'Network test failed');
+        UniversalAlert.error('Network test failed');
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to test network');
+      UniversalAlert.error('Failed to test network');
     }
   };
 
   const triggerManualSync = async () => {
     try {
-      Alert.alert('Info', 'Starting manual sync...');
+      UniversalAlert.info('Starting manual sync...');
       await LocalStorageService.triggerSync();
-      Alert.alert('Success', 'Data synchronized across all devices!');
+      UniversalAlert.success('Data synchronized across all devices!');
     } catch (error) {
-      Alert.alert('Error', 'Failed to sync data');
+      UniversalAlert.error('Failed to sync data');
     }
   };
 
@@ -310,8 +343,18 @@ const AdminDashboard: React.FC = () => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <Text style={styles.title}>Admin Dashboard</Text>
-        <Text style={styles.subtitle}>Enhanced ERP Management</Text>
+        <View style={styles.headerContent}>
+          <Text style={styles.title}>Admin Dashboard</Text>
+          <Text style={styles.subtitle}>Enhanced ERP Management</Text>
+          {user && <Text style={styles.welcomeText}>Welcome, {user.name}</Text>}
+        </View>
+        <TouchableOpacity 
+          style={styles.logoutButton} 
+          onPress={signOut}
+        >
+          <Ionicons name="log-out-outline" size={20} color="white" />
+          <Text style={styles.logoutButtonText}>Logout</Text>
+        </TouchableOpacity>
         
         {/* Cross-Device Sync Status */}
         <View style={styles.syncContainer}>
@@ -426,6 +469,13 @@ const AdminDashboard: React.FC = () => {
             onPress={() => setShowCreateUser(true)}
           >
             <Text style={styles.actionButtonText}>➕ Create User</Text>
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => navigation?.navigate('UserManagement')}
+          >
+            <Text style={styles.actionButtonText}>👥 Manage Users</Text>
           </TouchableOpacity>
           
           <TouchableOpacity 
@@ -713,6 +763,32 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     padding: 20,
     paddingTop: 50,
+  },
+  headerContent: {
+    flex: 1,
+  },
+  logoutButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  logoutButtonText: {
+    color: 'white',
+    marginLeft: 4,
+    fontSize: 14,
+    fontWeight: '500',
+  },
+  welcomeText: {
+    fontSize: 14,
+    color: 'white',
+    opacity: 0.9,
+    marginTop: 4,
   },
   title: {
     fontSize: 24,

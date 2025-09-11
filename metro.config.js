@@ -3,38 +3,25 @@ const { getDefaultConfig } = require('expo/metro-config');
 
 const config = getDefaultConfig(__dirname);
 
-// Performance optimizations
+// Basic platform support
 config.resolver.platforms = ['ios', 'android', 'native', 'web'];
 
-// Bundle splitting for web
+// Safe transformer options
 config.transformer.getTransformOptions = async () => ({
   transform: {
     experimentalImportSupport: false,
-    inlineRequires: true,
+    inlineRequires: false, // Set to false to prevent module resolution issues
   },
 });
 
-// Optimize bundle size
-config.transformer.minifierConfig = {
-  keep_fnames: true,
-  mangle: {
-    keep_fnames: true,
-  },
-};
-
 // Asset optimization
 config.resolver.assetExts.push(
-  // Add more asset extensions if needed
   'bin', 'txt', 'jpg', 'png', 'json'
 );
 
-// Source map configuration for production debugging
-config.serializer.createModuleIdFactory = function() {
-  const projectRoot = process.cwd();
-  return function(path) {
-    // Create predictable module IDs for better caching
-    return path.substr(projectRoot.length + 1);
-  };
-};
+// Use default module ID factory to prevent path truncation issues
+// config.serializer.createModuleIdFactory removed to use Metro's default
+
+module.exports = config;
 
 module.exports = config;

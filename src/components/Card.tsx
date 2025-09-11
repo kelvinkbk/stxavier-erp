@@ -1,13 +1,22 @@
 // src/components/Card.tsx
 import React from 'react';
-import { View, StyleSheet, ViewStyle } from 'react-native';
+import { StyleSheet, TouchableOpacity, View, ViewStyle } from 'react-native';
 
 interface CardProps {
   children: React.ReactNode;
-  style?: ViewStyle;
+  style?: ViewStyle | ViewStyle[];
+  onPress?: () => void;
 }
 
-export const Card = ({ children, style }: CardProps) => {
+export const Card = ({ children, style, onPress }: CardProps) => {
+  if (onPress) {
+    return (
+      <TouchableOpacity style={[styles.card, style]} onPress={onPress} activeOpacity={0.8}>
+        {children}
+      </TouchableOpacity>
+    );
+  }
+
   return (
     <View style={[styles.card, style]}>
       {children}

@@ -1,6 +1,6 @@
 // src/screens/Auth/RegisterScreen.tsx
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Alert, ScrollView, TextInput } from "react-native";
+import { View, Text, StyleSheet, ScrollView, TextInput } from "react-native";
 import { createUserWithEmailAndPassword } from "firebase/auth";
 import { auth } from "../../firebase";
 import { User } from "../../types";
@@ -8,6 +8,7 @@ import { Button } from "../../components/Button";
 import { Card } from "../../components/Card";
 import { LocalStorageService } from "../../services/localStorage";
 import SyncStatusComponent from "../../components/SyncStatusComponent";
+import { UniversalAlert } from "../../utils/universalAlert";
 
 interface RegisterScreenProps {
   navigation: any;
@@ -26,24 +27,24 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
 
   const onRegister = async () => {
     if (!email || !password || !name || !username) {
-      Alert.alert("Error", "Please fill in all required fields");
+      UniversalAlert.error("Please fill in all required fields");
       return;
     }
 
     if (password !== confirmPassword) {
-      Alert.alert("Error", "Passwords do not match");
+      UniversalAlert.error("Passwords do not match");
       return;
     }
 
     if (password.length < 6) {
-      Alert.alert("Error", "Password must be at least 6 characters");
+      UniversalAlert.error("Password must be at least 6 characters");
       return;
     }
 
     // Check username availability
     const isUsernameAvailable = await LocalStorageService.isUsernameAvailable(username);
     if (!isUsernameAvailable) {
-      Alert.alert("Error", "Username is already taken");
+      UniversalAlert.error("Username is already taken");
       return;
     }
 
@@ -73,9 +74,9 @@ export default function RegisterScreen({ navigation }: RegisterScreenProps) {
         console.warn('Sync failed after registration:', syncError);
       }
       
-      Alert.alert("Success", "Account created successfully!");
+      UniversalAlert.success("Account created successfully!");
     } catch (err: any) {
-      Alert.alert("Registration failed", err.message || "Unknown error");
+      UniversalAlert.error(err.message || "Unknown error");
     } finally {
       setLoading(false);
     }

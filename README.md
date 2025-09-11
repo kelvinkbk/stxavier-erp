@@ -9,6 +9,8 @@
 
 A comprehensive **100% FREE** ERP (Enterprise Resource Planning) system for educational institutions built with React Native, Expo, TypeScript, and Firebase.
 
+> **✨ Recently Cleaned & Optimized**: Project structure has been cleaned up and organized for better maintainability. See [`docs/CLEANUP_SUMMARY.md`](docs/CLEANUP_SUMMARY.md) for details.
+
 ## 🚀 All-in-One Quick Start Commands
 
 ### **Single Command Development & Testing:**
@@ -307,11 +309,37 @@ eas build --platform ios
 4. Push to the branch (`git push origin feature/amazing-feature`)
 5. Open a Pull Request
 
+
+## ?? Documentation
+
+This project includes comprehensive documentation organized in the `docs/` folder:
+
+### **Setup & Configuration**
+- [`GITHUB_SECRETS_SETUP.md`](docs/GITHUB_SECRETS_SETUP.md) - Complete secrets configuration guide
+- [`FIREBASE_PERMISSIONS_FIX.md`](docs/FIREBASE_PERMISSIONS_FIX.md) - Firebase security rules setup
+- [`FIRESTORE_PERMISSIONS_FIX.md`](docs/FIRESTORE_PERMISSIONS_FIX.md) - Firestore permissions troubleshooting
+
+### **Deployment & Building**
+- [`DEPLOYMENT_GUIDE.md`](docs/DEPLOYMENT_GUIDE.md) - Production deployment guide
+- [`MOBILE_BUILD_GUIDE.md`](docs/MOBILE_BUILD_GUIDE.md) - Mobile app building instructions
+
+### **Features & Maintenance**
+- [`PROJECT_COMPLETION_SUMMARY.md`](docs/PROJECT_COMPLETION_SUMMARY.md) - Complete project overview
+- [`ENHANCED_FEATURES.md`](docs/ENHANCED_FEATURES.md) - Advanced features documentation
+- [`CLEANUP_SUMMARY.md`](docs/CLEANUP_SUMMARY.md) - Recent cleanup and organization details
+
+### **Historical Reference**
+- [`docs/archive/`](docs/archive/) - Historical status reports and development logs
+
+---
+
+* Project cleaned and organized on September 6, 2025*
+
 ## Support
 
 For support and queries, please contact:
 - Email: support@stxavier-erp.com
-- Documentation: [Link to detailed docs]
+- Documentation: [Complete docs folder](docs/)
 
 ## License
 

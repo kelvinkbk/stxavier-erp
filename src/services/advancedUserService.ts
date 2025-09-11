@@ -75,12 +75,16 @@ export class AdvancedUserService extends LocalStorageService {
         }
         
         // Date range filter
-        if (filter.dateFrom && user.createdAt < filter.dateFrom) {
-          return false;
-        }
-        
-        if (filter.dateTo && user.createdAt > filter.dateTo) {
-          return false;
+        if (filter.dateFrom || filter.dateTo) {
+          const userDate = this.safeParseDate(user.createdAt);
+          
+          if (filter.dateFrom && userDate < filter.dateFrom) {
+            return false;
+          }
+          
+          if (filter.dateTo && userDate > filter.dateTo) {
+            return false;
+          }
         }
         
         return true;
@@ -284,9 +288,10 @@ export class AdvancedUserService extends LocalStorageService {
         recentActivity: activities.filter(activity => 
           new Date(activity.timestamp) > new Date(Date.now() - 24 * 60 * 60 * 1000)
         ).length,
-        newUsersThisMonth: users.filter(user => 
-          user.createdAt > thisMonth
-        ).length
+        newUsersThisMonth: users.filter(user => {
+          const userDate = this.safeParseDate(user.createdAt);
+          return userDate > thisMonth;
+        }).length
       };
 
       // Count by role
@@ -375,28 +380,34 @@ export class AdvancedUserService extends LocalStorageService {
       const csvRows = [headers.join(',')];
       
       users.forEach(user => {
+        // Use the safe date parsing utility
+        const createdAtString = this.safeParseDate(user.createdAt).toISOString();
+        
         const row = [
-          user.uid,
-          user.name,
-          user.email,
-          user.username,
-          user.role,
+          user.uid || '',
+          user.name || '',
+          user.email || '',
+          user.username || '',
+          user.role || '',
           user.department || '',
           user.regNo || '',
           user.phone || '',
-          user.createdAt.toISOString()
+          createdAtString
         ];
-        csvRows.push(row.map(field => `"${field}"`).join(','));
+        csvRows.push(row.map(field => `"${String(field).replace(/"/g, '""')}"`).join(','));
       });
       
       const csv = csvRows.join('\n');
       
-      // JSON export
+      // JSON export - normalize dates
       const exportData = {
         exportDate: new Date().toISOString(),
         totalUsers: users.length,
         filter: filter || null,
-        users: users
+        users: users.map(user => ({
+          ...user,
+          createdAt: this.safeParseDate(user.createdAt).toISOString()
+        }))
       };
       
       const json = JSON.stringify(exportData, null, 2);
@@ -404,7 +415,7 @@ export class AdvancedUserService extends LocalStorageService {
       return { csv, json };
     } catch (error) {
       console.error('Error exporting users:', error);
-      return { csv: '', json: '{}' };
+      throw new Error(`Export failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   }
 

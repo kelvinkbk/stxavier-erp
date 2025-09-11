@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+.expo/
+dist/
+build/
+
+# Generated files
+*.d.ts
+
+# Package files
+package-lock.json
+yarn.lock
+
+# Config files
+.env
+.env.*
+
+# Logs
+*.log
+
+# OS generated files
+.DS_Store
+Thumbs.db
+
+# IDE files
+.vscode/
+.idea/
+
+# Git
+.git/

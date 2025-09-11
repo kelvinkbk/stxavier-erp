@@ -7,9 +7,10 @@ import {
   TouchableOpacity,
   Alert,
   TextInput,
-  ActivityIndicator
+  ActivityIndicator,
+  Modal
 } from 'react-native';
-import { signOut } from 'firebase/auth';
+import { signOut, updatePassword, reauthenticateWithCredential, EmailAuthProvider } from 'firebase/auth';
 import { auth } from '../firebase';
 import { LocalStorageService } from '../services/localStorage';
 import SyncStatusComponent from '../components/SyncStatusComponent';
@@ -26,6 +27,15 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation }) => 
   const [editing, setEditing] = useState(false);
   const [editedUser, setEditedUser] = useState<Partial<User>>({});
   const [saving, setSaving] = useState(false);
+  
+  // Password change states
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [changingPassword, setChangingPassword] = useState(false);
+  const [passwordData, setPasswordData] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   useEffect(() => {
     loadUserProfile();
@@ -49,8 +59,65 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation }) => 
     }
   };
 
+  const handlePasswordChange = async () => {
+    if (!passwordData.currentPassword || !passwordData.newPassword || !passwordData.confirmPassword) {
+      Alert.alert('Error', 'Please fill in all password fields');
+      return;
+    }
+
+    if (passwordData.newPassword.length < 6) {
+      Alert.alert('Error', 'New password must be at least 6 characters');
+      return;
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert('Error', 'New passwords do not match');
+      return;
+    }
+
+    setChangingPassword(true);
+    try {
+      const currentUser = auth.currentUser;
+      if (!currentUser || !user) {
+        Alert.alert('Error', 'User not authenticated');
+        return;
+      }
+
+      // Re-authenticate user with current password
+      const credential = EmailAuthProvider.credential(user.email, passwordData.currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+
+      // Update password
+      await updatePassword(currentUser, passwordData.newPassword);
+
+      Alert.alert('Success', 'Password changed successfully!');
+      setShowPasswordModal(false);
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    } catch (error: any) {
+      console.error('Error changing password:', error);
+      if (error.code === 'auth/wrong-password') {
+        Alert.alert('Error', 'Current password is incorrect');
+      } else if (error.code === 'auth/weak-password') {
+        Alert.alert('Error', 'New password is too weak');
+      } else {
+        Alert.alert('Error', error.message || 'Failed to change password');
+      }
+    } finally {
+      setChangingPassword(false);
+    }
+  };
+
   const handleSaveProfile = async () => {
     if (!user || !auth.currentUser) return;
+
+    // Validate username if changed
+    if (editedUser.username && editedUser.username !== user.username) {
+      const isUsernameAvailable = await LocalStorageService.isUsernameAvailable(editedUser.username);
+      if (!isUsernameAvailable) {
+        Alert.alert('Error', 'Username is already taken');
+        return;
+      }
+    }
 
     setSaving(true);
     try {
@@ -193,8 +260,17 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation }) => 
 
         <View style={styles.fieldContainer}>
           <Text style={styles.fieldLabel}>Username</Text>
-          <Text style={[styles.fieldValue, styles.readOnly]}>{user.username}</Text>
-          <Text style={styles.readOnlyNote}>Username cannot be changed</Text>
+          {editing ? (
+            <TextInput
+              style={styles.input}
+              value={editedUser.username || ''}
+              onChangeText={(text) => setEditedUser(prev => ({ ...prev, username: text }))}
+              placeholder="Enter your username"
+              autoCapitalize="none"
+            />
+          ) : (
+            <Text style={styles.fieldValue}>@{user.username}</Text>
+          )}
         </View>
 
         <View style={styles.fieldContainer}>
@@ -274,10 +350,86 @@ const UserProfileScreen: React.FC<UserProfileScreenProps> = ({ navigation }) => 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Account Actions</Text>
         
+        {/* Password Change Section */}
+        <TouchableOpacity 
+          style={styles.actionButton} 
+          onPress={() => setShowPasswordModal(true)}
+        >
+          <Text style={styles.actionButtonText}>🔒 Change Password</Text>
+        </TouchableOpacity>
+        
         <TouchableOpacity style={styles.logoutButton} onPress={handleLogout}>
-          <Text style={styles.logoutButtonText}>Logout</Text>
+          <Text style={styles.logoutButtonText}>Sign Out</Text>
         </TouchableOpacity>
       </View>
+
+      {/* Password Change Modal */}
+      <Modal visible={showPasswordModal} animationType="slide" transparent={true}>
+        <View style={styles.modalOverlay}>
+          <View style={styles.passwordModalContainer}>
+            <View style={styles.passwordModalHeader}>
+              <Text style={styles.passwordModalTitle}>Change Password</Text>
+              <TouchableOpacity
+                onPress={() => {
+                  setShowPasswordModal(false);
+                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+                }}
+                style={styles.closeButton}
+              >
+                <Text style={styles.closeButtonText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            <View style={styles.passwordModalContent}>
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Current Password *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordData.currentPassword}
+                  onChangeText={(text) => setPasswordData(prev => ({ ...prev, currentPassword: text }))}
+                  placeholder="Enter current password"
+                  secureTextEntry
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>New Password *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordData.newPassword}
+                  onChangeText={(text) => setPasswordData(prev => ({ ...prev, newPassword: text }))}
+                  placeholder="Enter new password (min 6 characters)"
+                  secureTextEntry
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <View style={styles.fieldContainer}>
+                <Text style={styles.fieldLabel}>Confirm New Password *</Text>
+                <TextInput
+                  style={styles.input}
+                  value={passwordData.confirmPassword}
+                  onChangeText={(text) => setPasswordData(prev => ({ ...prev, confirmPassword: text }))}
+                  placeholder="Confirm new password"
+                  secureTextEntry
+                  placeholderTextColor="#999"
+                />
+              </View>
+
+              <TouchableOpacity
+                style={[styles.saveButton, changingPassword && styles.saveButtonDisabled]}
+                onPress={handlePasswordChange}
+                disabled={changingPassword}
+              >
+                <Text style={styles.buttonText}>
+                  {changingPassword ? 'Changing Password...' : 'Change Password'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
     </ScrollView>
   );
 };
@@ -423,6 +575,54 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     color: 'white',
     fontWeight: 'bold',
+  },
+  actionButton: {
+    backgroundColor: '#007AFF',
+    padding: 15,
+    borderRadius: 8,
+    alignItems: 'center',
+    marginBottom: 10,
+  },
+  actionButtonText: {
+    color: 'white',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  passwordModalContainer: {
+    backgroundColor: 'white',
+    width: '90%',
+    maxWidth: 400,
+    borderRadius: 12,
+    padding: 0,
+  },
+  passwordModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: 20,
+    borderBottomWidth: 1,
+    borderBottomColor: '#e0e0e0',
+  },
+  passwordModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#333',
+  },
+  closeButton: {
+    padding: 5,
+  },
+  closeButtonText: {
+    fontSize: 18,
+    color: '#666',
+  },
+  passwordModalContent: {
+    padding: 20,
   },
 });
 
