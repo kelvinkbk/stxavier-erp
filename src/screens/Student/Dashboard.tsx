@@ -1,4 +1,5 @@
 // src/screens/Student/Dashboard.tsx
+import { Ionicons } from '@expo/vector-icons';
 import { Dimensions, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useAuth } from '../../utils/AuthContext';
 import { NavigationDebug } from '../../utils/navigationDebug';
@@ -169,6 +170,12 @@ export default function StudentDashboard({ navigation }: { navigation: any }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.modernHeader}>
+        <TouchableOpacity 
+          style={styles.menuButton} 
+          onPress={() => navigation?.openDrawer?.()}
+        >
+          <Ionicons name="menu" size={24} color="white" />
+        </TouchableOpacity>
         <View style={styles.headerContent}>
           <View style={styles.userInfo}>
             <Text style={styles.welcomeText}>Welcome back! 👋</Text>
@@ -230,6 +237,13 @@ const styles = StyleSheet.create({
     paddingTop: 60,
     paddingBottom: 30,
     paddingHorizontal: 20,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 10,
+    marginTop: 4,
   },
   headerContent: {
     flexDirection: 'row',

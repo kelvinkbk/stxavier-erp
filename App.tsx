@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import { AuthProvider } from './src/utils/AuthContext';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import AppNavigator from './src/navigation/AppNavigator';
+import 'react-native-gesture-handler';
 
 // Platform-specific SafeAreaProvider import
 let SafeAreaProvider;

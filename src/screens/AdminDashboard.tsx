@@ -355,6 +355,12 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
+        <TouchableOpacity 
+          style={styles.menuButton} 
+          onPress={() => navigation?.openDrawer?.()}
+        >
+          <Ionicons name="menu" size={24} color="white" />
+        </TouchableOpacity>
         <View style={styles.headerContent}>
           <Text style={styles.title}>Admin Dashboard</Text>
           <Text style={styles.subtitle}>Enhanced ERP Management</Text>
@@ -731,6 +737,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#007AFF',
     padding: 20,
     paddingTop: 50,
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+  },
+  menuButton: {
+    padding: 8,
+    marginRight: 10,
+    marginTop: 4,
   },
   headerContent: {
     flex: 1,

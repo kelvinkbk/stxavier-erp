@@ -131,14 +131,8 @@ const DrawerNavigator: React.FC = () => {
           backgroundColor: '#fff',
           width: 280,
         },
-        headerStyle: {
-          backgroundColor:
-            user?.role === 'admin' ? '#1976d2' : user?.role === 'faculty' ? '#388e3c' : '#f57c00',
-        },
-        headerTintColor: '#fff',
-        headerTitleStyle: {
-          fontWeight: 'bold',
-        },
+        headerShown: false, // Hide the drawer header so screens can use their own headers
+        drawerHideStatusBarOnOpen: false,
       }}
     >
       {/* Dashboard Screen */}
@@ -153,7 +147,6 @@ const DrawerNavigator: React.FC = () => {
         }
         options={{
           title: `${user?.role?.charAt(0).toUpperCase()}${user?.role?.slice(1)} Dashboard`,
-          headerLeft: () => null, // This will show the hamburger menu
         }}
       />
 
