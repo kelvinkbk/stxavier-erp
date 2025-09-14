@@ -45,7 +45,7 @@ Write-Host "Version updated to: $newVersion" -ForegroundColor Green
 if ($Platform -eq "ios" -or $Platform -eq "both") {
     Write-Host "🍎 Building for iOS..." -ForegroundColor Blue
     eas build --platform ios --profile $BuildType --non-interactive
-    
+
     if ($LASTEXITCODE -eq 0 -and $BuildType -eq "production") {
         Write-Host "📤 Submitting to App Store..." -ForegroundColor Blue
         eas submit --platform ios --latest --non-interactive
@@ -56,7 +56,7 @@ if ($Platform -eq "ios" -or $Platform -eq "both") {
 if ($Platform -eq "android" -or $Platform -eq "both") {
     Write-Host "🤖 Building for Android..." -ForegroundColor Green
     eas build --platform android --profile $BuildType --non-interactive
-    
+
     if ($LASTEXITCODE -eq 0 -and $BuildType -eq "production") {
         Write-Host "📤 Submitting to Google Play Store..." -ForegroundColor Green
         eas submit --platform android --latest --non-interactive

@@ -32,7 +32,7 @@ npm version patch --no-git-tag-version
 if [ "$PLATFORM" = "ios" ] || [ "$PLATFORM" = "both" ]; then
     echo "🍎 Building for iOS..."
     eas build --platform ios --profile $BUILD_TYPE --non-interactive
-    
+
     if [ $? -eq 0 ] && [ "$BUILD_TYPE" = "production" ]; then
         echo "📤 Submitting to App Store..."
         eas submit --platform ios --latest --non-interactive
@@ -43,7 +43,7 @@ fi
 if [ "$PLATFORM" = "android" ] || [ "$PLATFORM" = "both" ]; then
     echo "🤖 Building for Android..."
     eas build --platform android --profile $BUILD_TYPE --non-interactive
-    
+
     if [ $? -eq 0 ] && [ "$BUILD_TYPE" = "production" ]; then
         echo "📤 Submitting to Google Play Store..."
         eas submit --platform android --latest --non-interactive

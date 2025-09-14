@@ -1,6 +1,10 @@
 // src/services/AppStatusService.ts
-import { LocalStorageService } from './localStorage';
+import { Platform } from 'react-native';
+import * as Application from 'expo-application';
+import * as Device from 'expo-device';
+import * as Network from 'expo-network';
 import BackgroundService from './BackgroundService';
+import { LocalStorageService } from './localStorage';
 
 export interface AppStatus {
   isOnline: boolean;
@@ -16,7 +20,7 @@ export interface AppStatus {
 
 class AppStatusService {
   private static instance: AppStatusService;
-  
+
   static getInstance(): AppStatusService {
     if (!AppStatusService.instance) {
       AppStatusService.instance = new AppStatusService();
@@ -27,17 +31,18 @@ class AppStatusService {
   // Get comprehensive app status
   async getAppStatus(): Promise<AppStatus> {
     const backgroundService = BackgroundService.getInstance();
-    
+    const networkState = await Network.getNetworkStateAsync();
+
     return {
-      isOnline: navigator.onLine,
+      isOnline: networkState.isConnected ?? false,
       lastSync: await LocalStorageService.getItem('lastBackgroundSync'),
       backgroundFetchEnabled: await this.isBackgroundFetchEnabled(),
       notificationsEnabled: await this.areNotificationsEnabled(),
-      appVersion: require('../../package.json').version,
+      appVersion: await this.getAppVersion(),
       deviceInfo: {
         platform: this.getPlatform(),
         isDevice: this.isPhysicalDevice(),
-      }
+      },
     };
   }
 
@@ -78,16 +83,26 @@ class AppStatusService {
     return platform === 'iOS' || platform === 'Android';
   }
 
+  // Get app version
+  private async getAppVersion(): Promise<string> {
+    try {
+      return Application.nativeApplicationVersion || '1.0.0';
+    } catch (error) {
+      console.warn('Could not get app version:', error);
+      return '1.0.0';
+    }
+  }
+
   // Send status report
   async sendStatusReport(): Promise<void> {
     try {
       const status = await this.getAppStatus();
       console.log('📊 App Status Report:', status);
-      
+
       // Store status locally
       await LocalStorageService.setItem('lastStatusReport', {
         timestamp: new Date().toISOString(),
-        status
+        status,
       });
 
       // Send notification if there are issues
@@ -106,18 +121,18 @@ class AppStatusService {
   // Validate app configuration
   async validateConfiguration(): Promise<{ isValid: boolean; issues: string[] }> {
     const issues: string[] = [];
-    
+
     try {
       const status = await this.getAppStatus();
-      
+
       if (!status.backgroundFetchEnabled) {
         issues.push('Background sync not available');
       }
-      
+
       if (!status.notificationsEnabled) {
         issues.push('Push notifications not enabled');
       }
-      
+
       if (!status.lastSync) {
         issues.push('Initial sync not completed');
       } else {
@@ -130,12 +145,12 @@ class AppStatusService {
 
       return {
         isValid: issues.length === 0,
-        issues
+        issues,
       };
     } catch (error) {
       return {
         isValid: false,
-        issues: ['Failed to validate configuration']
+        issues: ['Failed to validate configuration'],
       };
     }
   }

@@ -324,6 +324,42 @@ export class LocalStorageService {
     }
   }
 
+  // Generic storage methods for background services
+  static async setItem(key: string, value: any): Promise<void> {
+    try {
+      const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
+      await AsyncStorage.setItem(key, jsonValue);
+    } catch (error) {
+      console.error(`Error storing ${key}:`, error);
+      throw error;
+    }
+  }
+
+  static async getItem(key: string): Promise<any> {
+    try {
+      const value = await AsyncStorage.getItem(key);
+      if (value === null) return null;
+      
+      try {
+        return JSON.parse(value);
+      } catch {
+        // If parsing fails, return as string
+        return value;
+      }
+    } catch (error) {
+      console.error(`Error retrieving ${key}:`, error);
+      return null;
+    }
+  }
+
+  static async removeItem(key: string): Promise<void> {
+    try {
+      await AsyncStorage.removeItem(key);
+    } catch (error) {
+      console.error(`Error removing ${key}:`, error);
+    }
+  }
+
   // Clear all data (for logout/reset)
   static async clearAll(): Promise<void> {
     try {

@@ -1,8 +1,9 @@
 // src/services/BackgroundService.ts
 import * as BackgroundFetch from 'expo-background-fetch';
-import * as TaskManager from 'expo-task-manager';
 import * as Notifications from 'expo-notifications';
+import * as TaskManager from 'expo-task-manager';
 import { LocalStorageService } from './localStorage';
+import { Platform } from 'react-native';
 
 const BACKGROUND_FETCH_TASK = 'background-fetch-erp';
 
@@ -19,13 +20,13 @@ Notifications.setNotificationHandler({
 TaskManager.defineTask(BACKGROUND_FETCH_TASK, async () => {
   try {
     console.log('Background fetch executing...');
-    
+
     // Sync data in background
     await syncDataInBackground();
-    
+
     // Check for important updates
     await checkForImportantUpdates();
-    
+
     console.log('Background fetch completed successfully');
     return BackgroundFetch.BackgroundFetchResult.NewData;
   } catch (error) {
@@ -116,7 +117,7 @@ class BackgroundService {
           repeats: true,
         },
       });
-      
+
       console.log('Periodic notifications scheduled');
     } catch (error) {
       console.error('Failed to schedule notifications:', error);
@@ -185,7 +186,7 @@ async function checkForImportantUpdates(): Promise<void> {
     // Only check if it's been more than 1 hour
     if (now - lastCheckTime > 60 * 60 * 1000) {
       await LocalStorageService.setItem('lastUpdateCheck', new Date().toISOString());
-      
+
       // Here you would typically call your API to check for updates
       console.log('Checked for important updates');
     }

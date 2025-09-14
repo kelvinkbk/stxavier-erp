@@ -37,7 +37,7 @@ Write-Host "This will generate QR codes you can scan to test on your phone" -For
 $buildChoice = Read-Host "Do you want to create a preview build now? (y/n)"
 if ($buildChoice -eq "y" -or $buildChoice -eq "Y") {
     eas build --platform all --profile preview
-    
+
     Write-Host "📱 QR codes generated! Scan them with:" -ForegroundColor Green
     Write-Host "- iOS: Camera app" -ForegroundColor Blue
     Write-Host "- Android: Expo Go app" -ForegroundColor Green
