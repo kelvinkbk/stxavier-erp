@@ -11,7 +11,7 @@ class ManualMigration {
     this.results = {
       usersProcessed: 0,
       datesFixed: 0,
-      errors: []
+      errors: [],
     };
   }
 
@@ -21,7 +21,7 @@ class ManualMigration {
       info: '📘',
       success: '✅',
       warning: '⚠️',
-      error: '❌'
+      error: '❌',
     }[type];
 
     console.log(`[${timestamp}] ${prefix} ${message}`);

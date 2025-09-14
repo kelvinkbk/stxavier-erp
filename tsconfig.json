@@ -8,6 +8,22 @@
     "skipLibCheck": true,
     "noImplicitAny": false,
     "strictNullChecks": false,
-    "exactOptionalPropertyTypes": false
+    "exactOptionalPropertyTypes": false,
+    "incremental": true,
+    "tsBuildInfoFile": ".tsbuildinfo",
+    "preserveWatchOutput": true,
+    "disableSourceOfProjectReferenceRedirect": true
+  },
+  "include": ["src/**/*", "App.tsx", "metro.config.js"],
+  "exclude": [
+    "dist/**/*",
+    ".expo/**/*",
+    "web-build/**/*",
+    "node_modules/**/*",
+    "**/*.test.*",
+    "**/__tests__/**/*"
+  ],
+  "ts-node": {
+    "esm": true
   }
 }

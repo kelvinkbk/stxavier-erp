@@ -32,15 +32,15 @@ console.log('');
 
 const expo = spawn('npx', ['expo', 'start'], {
   stdio: 'inherit',
-  shell: true
+  shell: true,
 });
 
-expo.on('error', (error) => {
+expo.on('error', error => {
   console.error('❌ Failed to start Expo:', error.message);
   process.exit(1);
 });
 
-expo.on('close', (code) => {
+expo.on('close', code => {
   console.log(`\n📊 Expo process exited with code ${code}`);
 });
 

@@ -1,26 +1,30 @@
-import { createUserWithEmailAndPassword, EmailAuthProvider, reauthenticateWithCredential } from 'firebase/auth';
+import {
+  createUserWithEmailAndPassword,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+} from 'firebase/auth';
 import { useEffect, useState } from 'react';
 import {
-    Alert,
-    Modal,
-    Platform,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  Alert,
+  Modal,
+  Platform,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from 'react-native';
 import { Button } from '../../components/Button';
 import { Card } from '../../components/Card';
 import { auth } from '../../firebase';
 import { LocalStorageService } from '../../services/localStorage';
 import { User } from '../../types';
+import { useAuth } from '../../utils/AuthContext';
 import { DuplicateUserCleanup } from '../../utils/duplicateUserCleanup';
 import { UserDeletionSyncFix } from '../../utils/fixUserDeletionSync';
 import { WebDeleteDebug } from '../../utils/webDeleteDebug';
 import { webDeleteQuickFix } from '../../utils/webDeleteQuickFix';
-import { useAuth } from '../../utils/AuthContext';
 
 export const UserManagementScreen = () => {
   const { user: currentUser, refreshUser } = useAuth();
@@ -61,7 +65,9 @@ export const UserManagementScreen = () => {
       if (stats.totalDuplicateUsers > 0) {
         console.log(`⚠️ Found ${stats.totalDuplicateUsers} duplicate users. Auto-cleaning...`);
         const cleanupResult = await DuplicateUserCleanup.autoResolveDuplicates();
-        console.log(`✅ Cleanup completed: ${cleanupResult.removed} removed, ${cleanupResult.kept} kept`);
+        console.log(
+          `✅ Cleanup completed: ${cleanupResult.removed} removed, ${cleanupResult.kept} kept`
+        );
 
         if (cleanupResult.errors.length > 0) {
           console.warn('⚠️ Some cleanup errors occurred:', cleanupResult.errors);
@@ -168,27 +174,53 @@ export const UserManagementScreen = () => {
 
     setLoading(true);
     try {
-      // Create Firebase auth user
-      const userCredential = await createUserWithEmailAndPassword(
-        auth,
-        formData.email,
-        formData.password
-      );
+      let firebaseUser;
+      let userData: User;
 
-      // Create user profile data
-      const userData: User = {
-        uid: userCredential.user.uid,
-        name: formData.name,
-        email: formData.email,
-        username: formData.username,
-        role: formData.role,
-        department: formData.department || undefined,
-        regNo: formData.regNo || undefined,
-        createdAt: new Date(),
-      };
+      try {
+        // Try Firebase creation first
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          formData.email,
+          formData.password
+        );
+        firebaseUser = userCredential.user;
+
+        userData = {
+          uid: firebaseUser.uid,
+          name: formData.name,
+          email: formData.email,
+          username: formData.username,
+          role: formData.role,
+          department: formData.department || undefined,
+          regNo: formData.regNo || undefined,
+          createdAt: new Date(),
+        };
+      } catch (firebaseError: any) {
+        console.log('Firebase creation failed, creating locally only:', firebaseError.message);
+
+        // Create user locally with generated UID
+        const localUID = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        userData = {
+          uid: localUID,
+          name: formData.name,
+          email: formData.email,
+          username: formData.username,
+          role: formData.role,
+          department: formData.department || undefined,
+          regNo: formData.regNo || undefined,
+          createdAt: new Date(),
+        };
+
+        Alert.alert(
+          'Created Locally',
+          'User created in local storage only. Enable Firebase Email/Password authentication for cloud sync.'
+        );
+      }
 
       // Save to local storage
-      await LocalStorageService.saveUser(userCredential.user.uid, userData);
+      await LocalStorageService.saveUser(userData.uid, userData);
 
       Alert.alert('Success', `${formData.role} account created successfully`);
       setShowCreateModal(false);
@@ -240,7 +272,10 @@ export const UserManagementScreen = () => {
           );
         } catch (passwordError) {
           console.error('Password update failed:', passwordError);
-          Alert.alert('Warning', 'Profile updated but password change failed. Please try changing password separately.');
+          Alert.alert(
+            'Warning',
+            'Profile updated but password change failed. Please try changing password separately.'
+          );
         }
       } else {
         Alert.alert('Success', 'User updated successfully');
@@ -272,7 +307,9 @@ export const UserManagementScreen = () => {
     // Platform-specific handling for better compatibility
     if (Platform.OS === 'web') {
       // Web-specific implementation
-      const adminPassword = prompt(`🔐 Enter your admin password to access ${user.name}'s password information:`);
+      const adminPassword = prompt(
+        `🔐 Enter your admin password to access ${user.name}'s password information:`
+      );
       if (adminPassword) {
         await verifyAdminCredentials(user, adminPassword);
       }
@@ -302,12 +339,17 @@ export const UserManagementScreen = () => {
       await reauthenticateWithCredential(currentUser, credential);
 
       // Show success message with options
-      const resetPassword = Platform.OS === 'web'
-        ? confirm(`✅ Access granted for ${user.name}\n\n🔒 For security, passwords are encrypted and cannot be displayed.\n\nWould you like to reset ${user.name}'s password?`)
-        : false;
+      const resetPassword =
+        Platform.OS === 'web'
+          ? confirm(
+              `✅ Access granted for ${user.name}\n\n🔒 For security, passwords are encrypted and cannot be displayed.\n\nWould you like to reset ${user.name}'s password?`
+            )
+          : false;
 
       if (Platform.OS === 'web') {
-        alert(`✅ Password Access Granted for ${user.name}\n\n📋 Security Information:\n• Passwords are encrypted and cannot be displayed\n• You can reset the user's password using the Edit button\n• Users can change their own passwords from their profile\n\n🛡️ This access has been logged for security audit.`);
+        alert(
+          `✅ Password Access Granted for ${user.name}\n\n📋 Security Information:\n• Passwords are encrypted and cannot be displayed\n• You can reset the user's password using the Edit button\n• Users can change their own passwords from their profile\n\n🛡️ This access has been logged for security audit.`
+        );
 
         if (resetPassword) {
           openEditModal(user);
@@ -320,20 +362,21 @@ export const UserManagementScreen = () => {
             {
               text: 'Reset Password',
               style: 'default',
-              onPress: () => openEditModal(user)
+              onPress: () => openEditModal(user),
             },
-            { text: 'OK', style: 'cancel' }
+            { text: 'OK', style: 'cancel' },
           ]
         );
       }
-
     } catch (error: any) {
       console.error('Admin verification failed:', error);
       let errorMessage = 'Failed to verify admin credentials';
 
-      if (error.code === 'auth/wrong-password' ||
-          error.code === 'auth/invalid-credential' ||
-          error.code === 'auth/invalid-login-credentials') {
+      if (
+        error.code === 'auth/wrong-password' ||
+        error.code === 'auth/invalid-credential' ||
+        error.code === 'auth/invalid-login-credentials'
+      ) {
         errorMessage = 'Incorrect admin password. Please try again.';
       } else if (error.code === 'auth/too-many-requests') {
         errorMessage = 'Too many failed attempts. Please wait and try again.';
@@ -382,7 +425,10 @@ export const UserManagementScreen = () => {
       // Test functionality first
       const isReady = await webDeleteQuickFix.testDeleteFunctionality();
       if (!isReady) {
-        webDeleteQuickFix.showAlert('Error', 'Delete functionality is not ready. Please check the console for details.');
+        webDeleteQuickFix.showAlert(
+          'Error',
+          'Delete functionality is not ready. Please check the console for details.'
+        );
         return;
       }
 
@@ -408,11 +454,13 @@ export const UserManagementScreen = () => {
 
         // Reload users
         await loadUsers();
-
       } catch (error) {
         const errorMsg = error instanceof Error ? error.message : 'Unknown error';
         webDeleteQuickFix.log('DELETE', 'Delete failed', error);
-        webDeleteQuickFix.showAlert('Delete Failed', `Failed to delete user "${userName}".\n\nError: ${errorMsg}`);
+        webDeleteQuickFix.showAlert(
+          'Delete Failed',
+          `Failed to delete user "${userName}".\n\nError: ${errorMsg}`
+        );
       } finally {
         setLoading(false);
       }
@@ -437,7 +485,11 @@ export const UserManagementScreen = () => {
                 await loadUsers();
               } catch (error) {
                 console.error('❌ Error deleting user:', error);
-                Alert.alert('Error', 'Failed to delete user: ' + (error instanceof Error ? error.message : 'Unknown error'));
+                Alert.alert(
+                  'Error',
+                  'Failed to delete user: ' +
+                    (error instanceof Error ? error.message : 'Unknown error')
+                );
               } finally {
                 setLoading(false);
               }
@@ -483,7 +535,10 @@ export const UserManagementScreen = () => {
             <Text style={styles.statsText}>
               {duplicateStats.totalUsers} users
               {duplicateStats.totalDuplicateUsers > 0 && (
-                <Text style={styles.duplicateWarning}> • {duplicateStats.totalDuplicateUsers} duplicates detected</Text>
+                <Text style={styles.duplicateWarning}>
+                  {' '}
+                  • {duplicateStats.totalDuplicateUsers} duplicates detected
+                </Text>
               )}
             </Text>
           )}
@@ -535,11 +590,15 @@ export const UserManagementScreen = () => {
                           const result = await DuplicateUserCleanup.autoResolveDuplicates();
                           Alert.alert(
                             'Cleanup Complete',
-                            `Removed ${result.removed} duplicates, kept ${result.kept} users.${result.errors.length > 0 ? ` ${result.errors.length} errors occurred.` : ''}`
+                            `Removed ${result.removed} duplicates, kept ${result.kept} users.${
+                              result.errors.length > 0
+                                ? ` ${result.errors.length} errors occurred.`
+                                : ''
+                            }`
                           );
                           await loadUsers(); // Reload the user list and update stats
-                        }
-                      }
+                        },
+                      },
                     ]
                   );
                 } catch (error) {
@@ -559,7 +618,7 @@ export const UserManagementScreen = () => {
             <Text style={styles.emptyText}>No users found</Text>
           </Card>
         ) : (
-          users.map((user) => (
+          users.map(user => (
             <Card key={user.uid} style={styles.userCard}>
               <View style={styles.userHeader}>
                 <View style={styles.userInfo}>
@@ -571,9 +630,7 @@ export const UserManagementScreen = () => {
                     {user.department && (
                       <Text style={styles.userDepartment}>Dept: {user.department}</Text>
                     )}
-                    {user.regNo && (
-                      <Text style={styles.userStudentId}>Reg No: {user.regNo}</Text>
-                    )}
+                    {user.regNo && <Text style={styles.userStudentId}>Reg No: {user.regNo}</Text>}
                   </View>
                 </View>
                 <View style={styles.userActions}>
@@ -581,10 +638,7 @@ export const UserManagementScreen = () => {
                     <Text style={styles.roleText}>{user.role.toUpperCase()}</Text>
                   </View>
                   <View style={styles.actionButtons}>
-                    <TouchableOpacity
-                      onPress={() => openEditModal(user)}
-                      style={styles.editButton}
-                    >
+                    <TouchableOpacity onPress={() => openEditModal(user)} style={styles.editButton}>
                       <Text style={styles.editText}>✏️</Text>
                     </TouchableOpacity>
                     <TouchableOpacity
@@ -609,11 +663,7 @@ export const UserManagementScreen = () => {
       </ScrollView>
 
       {/* Create User Modal */}
-      <Modal
-        visible={showCreateModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showCreateModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Create New User</Text>
@@ -633,7 +683,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Full Name *</Text>
               <TextInput
                 value={formData.name}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
+                onChangeText={text => setFormData({ ...formData, name: text })}
                 style={styles.input}
                 placeholder="Enter full name"
                 placeholderTextColor="#999"
@@ -644,7 +694,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Email Address *</Text>
               <TextInput
                 value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                onChangeText={text => setFormData({ ...formData, email: text })}
                 style={styles.input}
                 placeholder="Enter email address"
                 keyboardType="email-address"
@@ -657,7 +707,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Username *</Text>
               <TextInput
                 value={formData.username}
-                onChangeText={(text) => setFormData({ ...formData, username: text })}
+                onChangeText={text => setFormData({ ...formData, username: text })}
                 style={styles.input}
                 placeholder="Enter username"
                 autoCapitalize="none"
@@ -669,7 +719,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Password *</Text>
               <TextInput
                 value={formData.password}
-                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                onChangeText={text => setFormData({ ...formData, password: text })}
                 style={styles.input}
                 placeholder="Enter password (min 6 characters)"
                 secureTextEntry
@@ -680,14 +730,11 @@ export const UserManagementScreen = () => {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Role *</Text>
               <View style={styles.roleSelector}>
-                {(['student', 'faculty', 'admin'] as const).map((role) => (
+                {(['student', 'faculty', 'admin'] as const).map(role => (
                   <TouchableOpacity
                     key={role}
                     onPress={() => setFormData({ ...formData, role })}
-                    style={[
-                      styles.roleOption,
-                      formData.role === role && styles.roleOptionSelected,
-                    ]}
+                    style={[styles.roleOption, formData.role === role && styles.roleOptionSelected]}
                   >
                     <Text style={styles.roleOptionIcon}>{getRoleIcon(role)}</Text>
                     <Text
@@ -707,7 +754,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Department</Text>
               <TextInput
                 value={formData.department}
-                onChangeText={(text) => setFormData({ ...formData, department: text })}
+                onChangeText={text => setFormData({ ...formData, department: text })}
                 style={styles.input}
                 placeholder="Enter department (optional)"
                 placeholderTextColor="#999"
@@ -719,7 +766,7 @@ export const UserManagementScreen = () => {
                 <Text style={styles.label}>Registration Number *</Text>
                 <TextInput
                   value={formData.regNo}
-                  onChangeText={(text) => setFormData({ ...formData, regNo: text })}
+                  onChangeText={text => setFormData({ ...formData, regNo: text })}
                   style={styles.input}
                   placeholder="Enter registration number"
                   placeholderTextColor="#999"
@@ -750,11 +797,7 @@ export const UserManagementScreen = () => {
       </Modal>
 
       {/* Edit User Modal */}
-      <Modal
-        visible={showEditModal}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showEditModal} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Edit User</Text>
@@ -774,7 +817,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Full Name *</Text>
               <TextInput
                 value={formData.name}
-                onChangeText={(text) => setFormData({ ...formData, name: text })}
+                onChangeText={text => setFormData({ ...formData, name: text })}
                 style={styles.input}
                 placeholder="Enter full name"
                 placeholderTextColor="#999"
@@ -785,7 +828,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Email Address *</Text>
               <TextInput
                 value={formData.email}
-                onChangeText={(text) => setFormData({ ...formData, email: text })}
+                onChangeText={text => setFormData({ ...formData, email: text })}
                 style={[styles.input, styles.disabledInput]}
                 placeholder="Enter email address"
                 keyboardType="email-address"
@@ -800,7 +843,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Username *</Text>
               <TextInput
                 value={formData.username}
-                onChangeText={(text) => setFormData({ ...formData, username: text })}
+                onChangeText={text => setFormData({ ...formData, username: text })}
                 style={styles.input}
                 placeholder="Enter username"
                 autoCapitalize="none"
@@ -811,14 +854,11 @@ export const UserManagementScreen = () => {
             <View style={styles.formGroup}>
               <Text style={styles.label}>Role *</Text>
               <View style={styles.roleSelector}>
-                {(['student', 'faculty', 'admin'] as const).map((role) => (
+                {(['student', 'faculty', 'admin'] as const).map(role => (
                   <TouchableOpacity
                     key={role}
                     onPress={() => setFormData({ ...formData, role })}
-                    style={[
-                      styles.roleOption,
-                      formData.role === role && styles.roleOptionSelected,
-                    ]}
+                    style={[styles.roleOption, formData.role === role && styles.roleOptionSelected]}
                   >
                     <Text style={styles.roleOptionIcon}>{getRoleIcon(role)}</Text>
                     <Text
@@ -838,7 +878,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Department</Text>
               <TextInput
                 value={formData.department}
-                onChangeText={(text) => setFormData({ ...formData, department: text })}
+                onChangeText={text => setFormData({ ...formData, department: text })}
                 style={styles.input}
                 placeholder="Enter department (optional)"
                 placeholderTextColor="#999"
@@ -850,7 +890,7 @@ export const UserManagementScreen = () => {
                 <Text style={styles.label}>Registration Number *</Text>
                 <TextInput
                   value={formData.regNo}
-                  onChangeText={(text) => setFormData({ ...formData, regNo: text })}
+                  onChangeText={text => setFormData({ ...formData, regNo: text })}
                   style={styles.input}
                   placeholder="Enter registration number"
                   placeholderTextColor="#999"
@@ -862,7 +902,7 @@ export const UserManagementScreen = () => {
               <Text style={styles.label}>Password</Text>
               <TextInput
                 value={formData.password}
-                onChangeText={(text) => setFormData({ ...formData, password: text })}
+                onChangeText={text => setFormData({ ...formData, password: text })}
                 style={styles.input}
                 placeholder="Enter new password (leave blank to keep current)"
                 secureTextEntry
@@ -924,11 +964,13 @@ export const UserManagementScreen = () => {
 
             <View style={styles.passwordModalContent}>
               <Text style={styles.warningText}>
-                🔐 Accessing user password information requires admin verification for {selectedUser?.name}.
+                🔐 Accessing user password information requires admin verification for{' '}
+                {selectedUser?.name}.
               </Text>
 
               <Text style={styles.securityNote}>
-                Note: For security reasons, actual passwords cannot be displayed. You can reset a user's password through the edit function.
+                Note: For security reasons, actual passwords cannot be displayed. You can reset a
+                user's password through the edit function.
               </Text>
 
               <Text style={styles.label}>Verify Your Admin Password *</Text>
@@ -957,7 +999,10 @@ export const UserManagementScreen = () => {
                 </TouchableOpacity>
 
                 <TouchableOpacity
-                  style={[styles.verifyButton, (loading || !adminPassword.trim()) && styles.disabledButton]}
+                  style={[
+                    styles.verifyButton,
+                    (loading || !adminPassword.trim()) && styles.disabledButton,
+                  ]}
                   onPress={verifyAdminAndShowPassword}
                   disabled={loading || !adminPassword.trim()}
                 >

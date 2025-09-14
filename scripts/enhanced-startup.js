@@ -18,12 +18,13 @@ class EnhancedStartup {
 
   log(message, type = 'info') {
     const timestamp = new Date().toLocaleTimeString();
-    const prefix = {
-      info: '📘',
-      success: '✅',
-      warning: '⚠️',
-      error: '❌'
-    }[type] || '📘';
+    const prefix =
+      {
+        info: '📘',
+        success: '✅',
+        warning: '⚠️',
+        error: '❌',
+      }[type] || '📘';
 
     console.log(`[${timestamp}] ${prefix} ${message}`);
   }
@@ -67,15 +68,15 @@ class EnhancedStartup {
     return new Promise((resolve, reject) => {
       const expo = spawn('npx', ['expo', 'start', '--tunnel'], {
         stdio: 'inherit',
-        shell: true
+        shell: true,
       });
 
-      expo.on('error', (error) => {
+      expo.on('error', error => {
         this.log(`Failed to start server: ${error.message}`, 'error');
         reject(error);
       });
 
-      expo.on('close', (code) => {
+      expo.on('close', code => {
         this.log(`Development server exited with code ${code}`, 'info');
         resolve(code);
       });

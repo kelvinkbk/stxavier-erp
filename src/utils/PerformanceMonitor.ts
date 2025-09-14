@@ -22,7 +22,7 @@ export class PerformanceMonitor {
     const metric: PerformanceMetric = {
       name: `${name}_start`,
       value: performance.now(),
-      timestamp: new Date()
+      timestamp: new Date(),
     };
     this.metrics.push(metric);
   }
@@ -30,13 +30,13 @@ export class PerformanceMonitor {
   endTiming(name: string): number {
     const endTime = performance.now();
     const startMetric = this.metrics.find(m => m.name === `${name}_start`);
-    
+
     if (startMetric) {
       const duration = endTime - startMetric.value;
       const endMetric: PerformanceMetric = {
         name: `${name}_duration`,
         value: duration,
-        timestamp: new Date()
+        timestamp: new Date(),
       };
       this.metrics.push(endMetric);
       return duration;

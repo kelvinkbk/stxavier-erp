@@ -1,6 +1,7 @@
 // src/services/debugAuth.ts
 // Debug utilities for authentication system
 
+import { auth } from '../firebase';
 import { User } from '../types';
 import { LocalStorageService } from './localStorage';
 
@@ -14,13 +15,18 @@ export class DebugAuth {
     try {
       const users = await LocalStorageService.getAllUsers();
       const adminUser = users.find(u => u.role === 'admin');
-      const currentUser = await LocalStorageService.getCurrentUser();
+
+      // Get current user from Firebase auth
+      let currentUser: User | null = null;
+      if (auth.currentUser) {
+        currentUser = await LocalStorageService.getUser(auth.currentUser.uid);
+      }
 
       return {
         hasUsers: users.length > 0,
         userCount: users.length,
         adminExists: !!adminUser,
-        currentUser
+        currentUser,
       };
     } catch (error) {
       console.error('Debug auth check failed:', error);
@@ -28,7 +34,7 @@ export class DebugAuth {
         hasUsers: false,
         userCount: 0,
         adminExists: false,
-        currentUser: null
+        currentUser: null,
       };
     }
   }
@@ -41,7 +47,7 @@ export class DebugAuth {
         email: 'admin@debug.test',
         username: 'admin',
         role: 'admin',
-        createdAt: new Date()
+        createdAt: new Date(),
       };
 
       await LocalStorageService.saveUser(debugAdmin.uid, debugAdmin);

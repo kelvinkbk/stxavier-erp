@@ -1,29 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  TextInput,
-  Modal,
-  Switch,
-  ActivityIndicator
-} from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { auth } from '../firebase';
-import { AdvancedUserService, UserStats, UserFilter, BulkUserData } from '../services/advancedUserService';
-import SecurityService from '../services/SecurityService';
-import PerformanceMonitor from '../services/PerformanceMonitor';
-import MigrationService from '../services/MigrationService';
-import { LocalStorageService } from '../services/localStorage';
-import { UniversalAlert } from '../utils/universalAlert';
-import SyncStatusComponent from '../components/SyncStatusComponent';
+import React, { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Modal,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
 import AutoRefreshSettings from '../components/AutoRefreshSettings';
 import SyncDebugPanel from '../components/SyncDebugPanel';
+import SyncStatusComponent from '../components/SyncStatusComponent';
+import { auth } from '../firebase';
+import { AdvancedUserService, UserFilter, UserStats } from '../services/advancedUserService';
+import { LocalStorageService } from '../services/localStorage';
+import MigrationService from '../services/MigrationService';
+import PerformanceMonitor from '../services/PerformanceMonitor';
+import SecurityService from '../services/SecurityService';
 import { User } from '../types';
 import { useAuth } from '../utils/AuthContext';
+import { UniversalAlert } from '../utils/universalAlert';
 
 interface AdminDashboardProps {
   navigation?: any;
@@ -52,26 +51,26 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
     role: 'student' as 'admin' | 'faculty' | 'student',
     department: '',
     regNo: '',
-    password: ''
+    password: '',
   });
 
   useEffect(() => {
     loadInitialData();
-    
+
     // Start performance monitoring
     const monitor = PerformanceMonitor.getInstance();
     monitor.startTiming('admin_dashboard_load');
-    
+
     // Start auto-refresh with 30-second interval
     LocalStorageService.startAutoRefresh(30000);
-    
+
     // Listen for auto-refresh data updates
-    const unsubscribeDataUpdate = LocalStorageService.onDataUpdate((data) => {
+    const unsubscribeDataUpdate = LocalStorageService.onDataUpdate(data => {
       console.log('📊 Auto-refresh: Dashboard data updated');
       // Refresh dashboard data when auto-refresh happens
       loadInitialData();
     });
-    
+
     return () => {
       monitor.endTiming('admin_dashboard_load');
       LocalStorageService.stopAutoRefresh();
@@ -84,9 +83,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
     try {
       const [userStats, allUsers] = await Promise.all([
         AdvancedUserService.getUserStatsAdvanced(),
-        AdvancedUserService.getAllUsers()
+        AdvancedUserService.getAllUsers(),
       ]);
-      
+
       setStats(userStats);
       setUsers(allUsers);
       setFilteredUsers(allUsers);
@@ -100,9 +99,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
   const handleSearch = async () => {
     const filter: UserFilter = {
       searchTerm: searchTerm || undefined,
-      role: selectedRole || undefined
+      role: selectedRole || undefined,
     };
-    
+
     const filtered = await AdvancedUserService.searchUsersAdvanced(filter);
     setFilteredUsers(filtered);
   };
@@ -116,15 +115,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
     setLoading(true);
     try {
       const result = await AdvancedUserService.importUsersFromCSVAdvanced(csvData);
-      
+
       UniversalAlert.success(
         `Import Complete!\n\nSuccess: ${result.success}\nFailed: ${result.failed}\n\n${
-          result.errors.length > 0 
-            ? `Errors:\n${result.errors.slice(0, 3).map(e => `Row ${e.row}: ${e.error}`).join('\n')}`
+          result.errors.length > 0
+            ? `Errors:\n${result.errors
+                .slice(0, 3)
+                .map(e => `Row ${e.row}: ${e.error}`)
+                .join('\n')}`
             : 'All users imported successfully!'
         }`
       );
-      
+
       setShowBulkImport(false);
       setCsvData('');
       loadInitialData();
@@ -157,15 +159,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
     try {
       // ⚡ TEMPORARY FIX: Create user locally only (bypassing Firebase 400 error)
       // TODO: Enable Email/Password authentication in Firebase Console to remove this workaround
-      
+
       let firebaseUser;
       let userData: User;
-      
+
       try {
         // Try Firebase creation first
-        const userCredential = await createUserWithEmailAndPassword(auth, newUserData.email, newUserData.password);
+        const userCredential = await createUserWithEmailAndPassword(
+          auth,
+          newUserData.email,
+          newUserData.password
+        );
         firebaseUser = userCredential.user;
-        
+
         userData = {
           uid: firebaseUser.uid,
           name: newUserData.name,
@@ -178,10 +184,10 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
         };
       } catch (firebaseError: any) {
         console.log('Firebase creation failed, creating locally only:', firebaseError.message);
-        
+
         // Create user locally with generated UID
         const localUID = 'local_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
-        
+
         userData = {
           uid: localUID,
           name: newUserData.name,
@@ -192,14 +198,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
           regNo: newUserData.regNo || undefined,
           createdAt: new Date(),
         };
-        
+
         UniversalAlert.info(
           'Created Locally - User created in local storage only. Enable Firebase Email/Password authentication for cloud sync.'
         );
       }
 
       await LocalStorageService.saveUser(userData.uid, userData);
-      
+
       // Security log
       const securityService = SecurityService.getInstance();
       await securityService.logSecurityEvent({
@@ -207,14 +213,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
         timestamp: new Date(),
         event: 'USER_CREATED_BY_ADMIN',
         details: {
-          newUserUid: firebaseUser.uid,
+          newUserUid: userData.uid,
           newUserEmail: newUserData.email,
-          newUserRole: newUserData.role
-        }
+          newUserRole: newUserData.role,
+        },
       });
-      
+
       UniversalAlert.success(`User account created successfully for ${newUserData.name}`);
-      
+
       // Reset form
       setNewUserData({
         name: '',
@@ -223,9 +229,9 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
         role: 'student',
         department: '',
         regNo: '',
-        password: ''
+        password: '',
       });
-      
+
       setShowCreateUser(false);
       loadInitialData();
     } catch (error: any) {
@@ -258,23 +264,29 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
   const exportUsers = async () => {
     try {
       setLoading(true);
-      
+
       const filter: UserFilter = {
         searchTerm: searchTerm || undefined,
-        role: selectedRole || undefined
+        role: selectedRole || undefined,
       };
-      
+
       console.log('📊 Starting user export with filter:', filter);
       const exported = await AdvancedUserService.exportUsersAdvanced(filter);
-      
+
       console.log('✅ Export completed successfully');
       UniversalAlert.success(
-        `Export Complete!\n\nSuccessfully exported ${filteredUsers.length} users!\n\n📋 CSV: ${exported.csv.length} characters\n📄 JSON: ${exported.json.length} characters\n\n📅 Export timestamp: ${new Date().toLocaleString()}`
+        `Export Complete!\n\nSuccessfully exported ${filteredUsers.length} users!\n\n📋 CSV: ${
+          exported.csv.length
+        } characters\n📄 JSON: ${
+          exported.json.length
+        } characters\n\n📅 Export timestamp: ${new Date().toLocaleString()}`
       );
     } catch (error: any) {
       console.error('❌ Export failed:', error);
       UniversalAlert.error(
-        `Export Failed!\n\nError details: ${error.message || 'Unknown error occurred'}\n\nPlease check the console for more details.`
+        `Export Failed!\n\nError details: ${
+          error.message || 'Unknown error occurred'
+        }\n\nPlease check the console for more details.`
       );
     } finally {
       setLoading(false);
@@ -308,7 +320,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
       const monitor = PerformanceMonitor.getInstance();
       UniversalAlert.info('Testing network performance...');
       const result = await monitor.testNetworkPerformance();
-      
+
       if (result) {
         UniversalAlert.success(
           `Network Test Result\n\nLatency: ${result.latency}ms\nConnection Type: ${result.connectionType}`
@@ -348,21 +360,15 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
           <Text style={styles.subtitle}>Enhanced ERP Management</Text>
           {user && <Text style={styles.welcomeText}>Welcome, {user.name}</Text>}
         </View>
-        <TouchableOpacity 
-          style={styles.logoutButton} 
-          onPress={signOut}
-        >
+        <TouchableOpacity style={styles.logoutButton} onPress={signOut}>
           <Ionicons name="log-out-outline" size={20} color="white" />
           <Text style={styles.logoutButtonText}>Logout</Text>
         </TouchableOpacity>
-        
+
         {/* Cross-Device Sync Status */}
         <View style={styles.syncContainer}>
           <SyncStatusComponent showDetails={true} />
-          <TouchableOpacity 
-            style={styles.debugButton} 
-            onPress={() => setShowSyncDebug(true)}
-          >
+          <TouchableOpacity style={styles.debugButton} onPress={() => setShowSyncDebug(true)}>
             <Ionicons name="bug" size={16} color="#666" />
             <Text style={styles.debugButtonText}>Debug</Text>
           </TouchableOpacity>
@@ -373,7 +379,8 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Cross-Device Synchronization</Text>
         <Text style={styles.syncDescription}>
-          Your data automatically syncs across all devices. Use manual sync if you're experiencing issues.
+          Your data automatically syncs across all devices. Use manual sync if you're experiencing
+          issues.
         </Text>
         <TouchableOpacity style={styles.syncButton} onPress={triggerManualSync}>
           <Text style={styles.buttonText}>Force Manual Sync</Text>
@@ -417,7 +424,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
       {/* Search and Filter */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>User Management</Text>
-        
+
         <View style={styles.searchContainer}>
           <TextInput
             style={styles.searchInput}
@@ -425,95 +432,77 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
             value={searchTerm}
             onChangeText={setSearchTerm}
           />
-          
+
           <View style={styles.filterRow}>
             <Text>Role Filter:</Text>
             <View style={styles.roleButtons}>
               {['', 'admin', 'faculty', 'student'].map(role => (
                 <TouchableOpacity
                   key={role}
-                  style={[
-                    styles.roleButton,
-                    selectedRole === role && styles.roleButtonActive
-                  ]}
+                  style={[styles.roleButton, selectedRole === role && styles.roleButtonActive]}
                   onPress={() => setSelectedRole(role)}
                 >
-                  <Text style={[
-                    styles.roleButtonText,
-                    selectedRole === role && styles.roleButtonTextActive
-                  ]}>
+                  <Text
+                    style={[
+                      styles.roleButtonText,
+                      selectedRole === role && styles.roleButtonTextActive,
+                    ]}
+                  >
                     {role || 'All'}
                   </Text>
                 </TouchableOpacity>
               ))}
             </View>
           </View>
-          
+
           <TouchableOpacity style={styles.searchButton} onPress={handleSearch}>
             <Text style={styles.buttonText}>Search</Text>
           </TouchableOpacity>
         </View>
 
-        <Text style={styles.resultCount}>
-          Found {filteredUsers.length} users
-        </Text>
+        <Text style={styles.resultCount}>Found {filteredUsers.length} users</Text>
       </View>
 
       {/* Action Buttons */}
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Actions</Text>
-        
+
         <View style={styles.actionGrid}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={[styles.actionButton, styles.primaryAction]}
             onPress={() => setShowCreateUser(true)}
           >
             <Text style={styles.actionButtonText}>➕ Create User</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.actionButton}
             onPress={() => navigation?.navigate('UserManagement')}
           >
             <Text style={styles.actionButtonText}>👥 Manage Users</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={() => setShowBulkImport(true)}
-          >
+
+          <TouchableOpacity style={styles.actionButton} onPress={() => setShowBulkImport(true)}>
             <Text style={styles.actionButtonText}>Bulk Import</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={exportUsers}
-          >
+
+          <TouchableOpacity style={styles.actionButton} onPress={exportUsers}>
             <Text style={styles.actionButtonText}>Export Users</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={loadPerformanceStats}
-          >
+
+          <TouchableOpacity style={styles.actionButton} onPress={loadPerformanceStats}>
             <Text style={styles.actionButtonText}>Performance</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={loadSecurityLogs}
-          >
+
+          <TouchableOpacity style={styles.actionButton} onPress={loadSecurityLogs}>
             <Text style={styles.actionButtonText}>Security Logs</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
-            style={styles.actionButton}
-            onPress={testNetworkPerformance}
-          >
+
+          <TouchableOpacity style={styles.actionButton} onPress={testNetworkPerformance}>
             <Text style={styles.actionButtonText}>Test Network</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={[styles.actionButton, styles.warningAction]}
             onPress={handleRunMigrations}
           >
@@ -523,11 +512,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
       </View>
 
       {/* Bulk Import Modal */}
-      <Modal
-        visible={showBulkImport}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showBulkImport} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Bulk Import Users</Text>
@@ -535,11 +520,11 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
               <Text style={styles.closeButton}>Close</Text>
             </TouchableOpacity>
           </View>
-          
+
           <Text style={styles.modalInstruction}>
             Paste CSV data with columns: name,email,username,role,department,regno,phone
           </Text>
-          
+
           <TextInput
             style={styles.csvInput}
             multiline
@@ -547,25 +532,19 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
             value={csvData}
             onChangeText={setCsvData}
           />
-          
-          <TouchableOpacity 
+
+          <TouchableOpacity
             style={styles.importButton}
             onPress={handleBulkImport}
             disabled={loading}
           >
-            <Text style={styles.buttonText}>
-              {loading ? 'Importing...' : 'Import Users'}
-            </Text>
+            <Text style={styles.buttonText}>{loading ? 'Importing...' : 'Import Users'}</Text>
           </TouchableOpacity>
         </View>
       </Modal>
 
       {/* Performance Stats Modal */}
-      <Modal
-        visible={showPerformanceStats}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showPerformanceStats} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Performance Statistics</Text>
@@ -573,7 +552,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
               <Text style={styles.closeButton}>Close</Text>
             </TouchableOpacity>
           </View>
-          
+
           {performanceData && (
             <ScrollView style={styles.modalContent}>
               <Text style={styles.perfStat}>
@@ -585,7 +564,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
               <Text style={styles.perfStat}>
                 Network Tests: {performanceData.networkStats.testCount}
               </Text>
-              
+
               <Text style={styles.perfTitle}>Screen Performance:</Text>
               {Object.entries(performanceData.screenStats).map(([screen, stats]: [string, any]) => (
                 <Text key={screen} style={styles.perfStat}>
@@ -598,11 +577,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
       </Modal>
 
       {/* Security Logs Modal */}
-      <Modal
-        visible={showSecurityLogs}
-        animationType="slide"
-        presentationStyle="pageSheet"
-      >
+      <Modal visible={showSecurityLogs} animationType="slide" presentationStyle="pageSheet">
         <View style={styles.modalContainer}>
           <View style={styles.modalHeader}>
             <Text style={styles.modalTitle}>Security Logs</Text>
@@ -610,18 +585,14 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
               <Text style={styles.closeButton}>Close</Text>
             </TouchableOpacity>
           </View>
-          
+
           <ScrollView style={styles.modalContent}>
             {securityLogs.map((log, index) => (
               <View key={index} style={styles.logEntry}>
                 <Text style={styles.logEvent}>{log.event}</Text>
-                <Text style={styles.logTime}>
-                  {new Date(log.timestamp).toLocaleString()}
-                </Text>
+                <Text style={styles.logTime}>{new Date(log.timestamp).toLocaleString()}</Text>
                 {log.details && (
-                  <Text style={styles.logDetails}>
-                    {JSON.stringify(log.details, null, 2)}
-                  </Text>
+                  <Text style={styles.logDetails}>{JSON.stringify(log.details, null, 2)}</Text>
                 )}
               </View>
             ))}
@@ -630,10 +601,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
       </Modal>
 
       {/* Sync Debug Panel */}
-      <SyncDebugPanel 
-        visible={showSyncDebug} 
-        onClose={() => setShowSyncDebug(false)} 
-      />
+      <SyncDebugPanel visible={showSyncDebug} onClose={() => setShowSyncDebug(false)} />
 
       {/* Create User Modal */}
       <Modal visible={showCreateUser} animationType="slide">
@@ -642,83 +610,85 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
           <Text style={styles.modalDescription}>
             Create a new user account with admin privileges. All fields marked with * are required.
           </Text>
-          
+
           <ScrollView style={styles.modalContent}>
             <TextInput
               style={styles.input}
               placeholder="Full Name *"
               value={newUserData.name}
-              onChangeText={(text) => setNewUserData(prev => ({ ...prev, name: text }))}
+              onChangeText={text => setNewUserData(prev => ({ ...prev, name: text }))}
             />
-            
+
             <TextInput
               style={styles.input}
               placeholder="Email Address *"
               value={newUserData.email}
-              onChangeText={(text) => setNewUserData(prev => ({ ...prev, email: text }))}
+              onChangeText={text => setNewUserData(prev => ({ ...prev, email: text }))}
               keyboardType="email-address"
               autoCapitalize="none"
             />
-            
+
             <TextInput
               style={styles.input}
               placeholder="Username *"
               value={newUserData.username}
-              onChangeText={(text) => setNewUserData(prev => ({ ...prev, username: text }))}
+              onChangeText={text => setNewUserData(prev => ({ ...prev, username: text }))}
               autoCapitalize="none"
             />
-            
+
             <TextInput
               style={styles.input}
               placeholder="Password * (min 6 characters)"
               value={newUserData.password}
-              onChangeText={(text) => setNewUserData(prev => ({ ...prev, password: text }))}
+              onChangeText={text => setNewUserData(prev => ({ ...prev, password: text }))}
               secureTextEntry
             />
-            
+
             <View style={styles.pickerContainer}>
               <Text style={styles.pickerLabel}>Role *</Text>
               <View style={styles.roleButtons}>
-                {(['student', 'faculty', 'admin'] as const).map((roleOption) => (
+                {(['student', 'faculty', 'admin'] as const).map(roleOption => (
                   <TouchableOpacity
                     key={roleOption}
                     style={[
                       styles.roleButton,
-                      newUserData.role === roleOption && styles.roleButtonActive
+                      newUserData.role === roleOption && styles.roleButtonActive,
                     ]}
                     onPress={() => setNewUserData(prev => ({ ...prev, role: roleOption }))}
                   >
-                    <Text style={[
-                      styles.roleButtonText,
-                      newUserData.role === roleOption && styles.roleButtonTextActive
-                    ]}>
+                    <Text
+                      style={[
+                        styles.roleButtonText,
+                        newUserData.role === roleOption && styles.roleButtonTextActive,
+                      ]}
+                    >
                       {roleOption.charAt(0).toUpperCase() + roleOption.slice(1)}
                     </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             </View>
-            
+
             <TextInput
               style={styles.input}
               placeholder="Department (optional)"
               value={newUserData.department}
-              onChangeText={(text) => setNewUserData(prev => ({ ...prev, department: text }))}
+              onChangeText={text => setNewUserData(prev => ({ ...prev, department: text }))}
             />
-            
+
             {newUserData.role === 'student' && (
               <TextInput
                 style={styles.input}
                 placeholder="Registration Number (optional)"
                 value={newUserData.regNo}
-                onChangeText={(text) => setNewUserData(prev => ({ ...prev, regNo: text }))}
+                onChangeText={text => setNewUserData(prev => ({ ...prev, regNo: text }))}
               />
             )}
           </ScrollView>
-          
+
           <View style={styles.modalActions}>
-            <TouchableOpacity 
-              style={styles.cancelButton} 
+            <TouchableOpacity
+              style={styles.cancelButton}
               onPress={() => {
                 setShowCreateUser(false);
                 setNewUserData({
@@ -728,20 +698,18 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
                   role: 'student',
                   department: '',
                   regNo: '',
-                  password: ''
+                  password: '',
                 });
               }}
             >
               <Text style={styles.buttonText}>Cancel</Text>
             </TouchableOpacity>
-            <TouchableOpacity 
-              style={[styles.importButton, loading && styles.disabledButton]} 
+            <TouchableOpacity
+              style={[styles.importButton, loading && styles.disabledButton]}
               onPress={handleCreateUser}
               disabled={loading}
             >
-              <Text style={styles.buttonText}>
-                {loading ? 'Creating...' : 'Create User'}
-              </Text>
+              <Text style={styles.buttonText}>{loading ? 'Creating...' : 'Create User'}</Text>
             </TouchableOpacity>
           </View>
         </View>
