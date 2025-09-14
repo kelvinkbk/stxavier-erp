@@ -355,10 +355,7 @@ const AdminDashboard: React.FC<AdminDashboardProps> = ({ navigation }) => {
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.menuButton} 
-          onPress={() => navigation?.openDrawer?.()}
-        >
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation?.openDrawer?.()}>
           <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
         <View style={styles.headerContent}>

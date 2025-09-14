@@ -32,7 +32,15 @@ const DashboardCard = ({ title, description, icon, color, onPress }: DashboardCa
   </TouchableOpacity>
 );
 
-const QuickStatCard = ({ title, value, color }: { title: string; value: string; color: string }) => (
+const QuickStatCard = ({
+  title,
+  value,
+  color,
+}: {
+  title: string;
+  value: string;
+  color: string;
+}) => (
   <View style={[styles.statCard, { borderColor: color }]}>
     <Text style={[styles.statValue, { color }]}>{value}</Text>
     <Text style={styles.statTitle}>{title}</Text>
@@ -170,10 +178,7 @@ export default function StudentDashboard({ navigation }: { navigation: any }) {
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       <View style={styles.modernHeader}>
-        <TouchableOpacity 
-          style={styles.menuButton} 
-          onPress={() => navigation?.openDrawer?.()}
-        >
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation?.openDrawer?.()}>
           <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
         <View style={styles.headerContent}>
@@ -185,10 +190,7 @@ export default function StudentDashboard({ navigation }: { navigation: any }) {
               {user?.department && <Text style={styles.departmentText}>🏛️ {user.department}</Text>}
             </View>
           </View>
-          <TouchableOpacity
-            style={styles.signOutButton}
-            onPress={signOut}
-          >
+          <TouchableOpacity style={styles.signOutButton} onPress={signOut}>
             <Text style={styles.signOutText}>Sign Out</Text>
           </TouchableOpacity>
         </View>

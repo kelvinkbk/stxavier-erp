@@ -13,7 +13,11 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.stxavier.erp"
+      "bundleIdentifier": "com.stxavier.erp",
+      "buildNumber": "1",
+      "infoPlist": {
+        "UIBackgroundModes": ["background-fetch", "background-processing"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -21,7 +25,14 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.stxavier.erp"
+      "package": "com.stxavier.erp",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE",
+        "android.permission.WAKE_LOCK",
+        "android.permission.RECEIVE_BOOT_COMPLETED"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png",
@@ -29,7 +40,34 @@
     },
     "scheme": "stxavier-erp",
     "platforms": ["ios", "android", "web"],
-    "description": "Complete Educational ERP System for St. Xavier College",
-    "githubUrl": "https://github.com/kelvinkbk/stxavier-erp"
+    "description": "Complete Educational ERP System for St. Xavier College - Always active mobile app",
+    "githubUrl": "https://github.com/kelvinkbk/stxavier-erp",
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 30000
+    },
+    "plugins": [
+      "expo-notifications",
+      "expo-background-fetch",
+      "expo-task-manager",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "enableProguardInReleaseBuilds": true,
+            "enableShrinkResourcesInReleaseBuilds": true
+          },
+          "ios": {
+            "deploymentTarget": "15.1"
+          }
+        }
+      ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "your-eas-project-id"
+      }
+    }
   }
 }

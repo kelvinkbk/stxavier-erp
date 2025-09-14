@@ -42,7 +42,15 @@ const DashboardCard = ({ title, description, icon, color, onPress }: DashboardCa
   </TouchableOpacity>
 );
 
-const QuickStatCard = ({ title, value, color }: { title: string; value: string; color: string }) => (
+const QuickStatCard = ({
+  title,
+  value,
+  color,
+}: {
+  title: string;
+  value: string;
+  color: string;
+}) => (
   <View style={styles.statCard}>
     <Text style={[styles.statValue, { color: color }]}>{value}</Text>
     <Text style={styles.statTitle}>{title}</Text>
@@ -149,10 +157,7 @@ export default function FacultyDashboard({ navigation }: { navigation: any }) {
     <ScrollView style={styles.container} contentContainerStyle={styles.scrollContent}>
       {/* Modern Header */}
       <View style={styles.modernHeader}>
-        <TouchableOpacity 
-          style={styles.menuButton} 
-          onPress={() => navigation?.openDrawer?.()}
-        >
+        <TouchableOpacity style={styles.menuButton} onPress={() => navigation?.openDrawer?.()}>
           <Ionicons name="menu" size={24} color="white" />
         </TouchableOpacity>
         <View style={styles.headerContent}>

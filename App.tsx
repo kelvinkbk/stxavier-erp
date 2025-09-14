@@ -1,9 +1,10 @@
-import React from 'react';
 import { StatusBar } from 'expo-status-bar';
-import { AuthProvider } from './src/utils/AuthContext';
+import React, { useEffect } from 'react';
+import 'react-native-gesture-handler';
 import { ErrorBoundary } from './src/components/ErrorBoundary';
 import AppNavigator from './src/navigation/AppNavigator';
-import 'react-native-gesture-handler';
+import BackgroundService from './src/services/BackgroundService';
+import { AuthProvider } from './src/utils/AuthContext';
 
 // Platform-specific SafeAreaProvider import
 let SafeAreaProvider;
@@ -16,6 +17,21 @@ try {
 }
 
 export default function App() {
+  // Initialize background services
+  useEffect(() => {
+    const initializeBackgroundServices = async () => {
+      try {
+        const backgroundService = BackgroundService.getInstance();
+        await backgroundService.initialize();
+        console.log('Background services initialized');
+      } catch (error) {
+        console.error('Failed to initialize background services:', error);
+      }
+    };
+
+    initializeBackgroundServices();
+  }, []);
+
   return (
     <SafeAreaProvider>
       <ErrorBoundary>
