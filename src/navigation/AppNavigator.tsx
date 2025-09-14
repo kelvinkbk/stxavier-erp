@@ -6,7 +6,7 @@ import { useAuth } from '../utils/AuthContext';
 import DrawerNavigator from './DrawerNavigator';
 
 // Auth Screens
-import LoginScreen from '../screens/LoginScreen';
+import LoginScreen from '../screens/Auth/LoginScreen';
 // import RegisterScreen from '../screens/Auth/RegisterScreen'; // SECURITY: Disabled public registration
 
 const Stack = createNativeStackNavigator();
